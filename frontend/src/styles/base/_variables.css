@@ -1,0 +1,17 @@
+:root {
+  --color-primary: #4f46e5;
+  --color-bg: #ffffff;
+  --color-text: #111827;
+
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+
+  --radius-md: 8px;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: sans-serif;
+}
