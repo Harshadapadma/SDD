@@ -23,11 +23,22 @@ class RecordCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         user = self.context["request"].user
 
-        return Record.objects.create(
+        record = Record.objects.create(
             created_by=user,
             updated_by=user,
             **validated_data
         )
+
+        # Give creator EDIT access by default
+        from .models import RecordAccess
+        RecordAccess.objects.create(
+            user=user,
+            record=record,
+            access_type="EDIT",
+            assigned_by=user
+        )
+
+        return record
     
     def update(self, instance, validated_data):
         for attr, value in validated_data.items():

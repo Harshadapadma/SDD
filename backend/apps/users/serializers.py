@@ -1,3 +1,4 @@
+import re
 from rest_framework import serializers
 from django.contrib.auth import authenticate
 from .models import User, UserRole
@@ -5,6 +6,28 @@ from .models import User, UserRole
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
+
+
+# -------------------------------
+# Shared Password Strength Validator
+# -------------------------------
+def validate_password_strength(password):
+    """
+    Enforces: min 8 chars, at least 1 uppercase letter,
+    at least 1 digit, and at least 1 special character.
+    """
+    errors = []
+    if len(password) < 8:
+        errors.append("Password must be at least 8 characters long.")
+    if not re.search(r'[A-Z]', password):
+        errors.append("Password must contain at least one uppercase letter.")
+    if not re.search(r'[0-9]', password):
+        errors.append("Password must contain at least one number.")
+    if not re.search(r'[!@#$%^&*()_+\-=\[\]{};\':"\\|,.<>\/?`~]', password):
+        errors.append("Password must contain at least one special character.")
+    if errors:
+        raise serializers.ValidationError(errors)
+    return password
 
 
 # -------------------------------
@@ -59,6 +82,9 @@ class SetPasswordSerializer(serializers.Serializer):
     uid = serializers.CharField()
     token = serializers.CharField()
     password = serializers.CharField(write_only=True)
+
+    def validate_password(self, value):
+        return validate_password_strength(value)
 
     def validate(self, data):
         try:
@@ -116,6 +142,13 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
         model = User
         fields = ["name", "designation", "company_name", "mobile_number"]
 
+    def validate_mobile_number(self, value):
+        if value:
+            digits = re.sub(r'\D', '', value)
+            if len(digits) != 10:
+                raise serializers.ValidationError("Mobile number must be exactly 10 digits.")
+        return value
+
 # -------------------------------
 # Change Password Serializer
 # -------------------------------
@@ -128,3 +161,6 @@ class ChangePasswordSerializer(serializers.Serializer):
         if not user.check_password(value):
             raise serializers.ValidationError("Old password is incorrect")
         return value
+
+    def validate_new_password(self, value):
+        return validate_password_strength(value)

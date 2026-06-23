@@ -4,13 +4,13 @@
     <!-- HEADER -->
     <div class="page-header">
       <div>
-        <h1 class="page-title">My Profile</h1>
-        <p class="page-sub">Manage your professional identity and contact details</p>
+        <h1 class="page-title">Admin Profile</h1>
+        <p class="page-sub">Manage your administrative identity and security</p>
       </div>
       <div class="header-badges">
-        <span :class="['status-badge', user?.is_profile_complete ? 'complete' : 'incomplete']">
-          <i :class="['fas', user?.is_profile_complete ? 'fa-check-circle' : 'fa-exclamation-triangle']"></i>
-          {{ user?.is_profile_complete ? 'Profile Complete' : 'Profile Incomplete' }}
+        <span class="status-badge complete">
+          <i class="fas fa-user-shield"></i>
+          Administrator
         </span>
       </div>
     </div>
@@ -20,7 +20,7 @@
       <!-- LEFT: AVATAR & BASIC INFO -->
       <div class="profile-card basic-info">
         <div class="avatar-large">
-          <i class="fas fa-user"></i>
+          <i class="fas fa-user-shield"></i>
         </div>
         <div class="user-meta">
           <h2>{{ user?.name }}</h2>
@@ -39,30 +39,27 @@
         <div class="profile-card form-info">
         <div class="card-header">
           <i class="fas fa-edit"></i>
-          <h3>Professional Details</h3>
+          <h3>Administrative Details</h3>
         </div>
         
         <div class="form-body">
           <div class="grid-2">
             <div class="form-group">
               <label>Full Name</label>
-              <input v-model="form.name" placeholder="Your Name" :disabled="isFormDisabled" />
+              <input v-model="form.name" placeholder="Admin Name" />
             </div>
             <div class="form-group">
               <label>Designation</label>
-              <input v-model="form.designation" placeholder="e.g. Senior Manager" :disabled="isFormDisabled" />
-              <small v-if="!form.designation" class="req">Required for completion</small>
+              <input v-model="form.designation" placeholder="e.g. Super Admin" />
             </div>
             <div class="form-group">
               <label>Company Name</label>
-              <input v-model="form.company_name" placeholder="e.g. Negen SDD" :disabled="isFormDisabled" />
-              <small v-if="!form.company_name" class="req">Required for completion</small>
+              <input v-model="form.company_name" placeholder="e.g. Negen SDD" />
             </div>
             <div class="form-group">
               <label>Mobile Number</label>
-              <input v-model="form.mobile_number" placeholder="e.g. 9876543210" :disabled="isFormDisabled" maxlength="10" @input="form.mobile_number = form.mobile_number.replace(/\D/g, '')" />
-              <small v-if="!form.mobile_number" class="req">Required for completion</small>
-              <small v-else-if="form.mobile_number.replace(/\D/g, '').length !== 10" class="req err">Must be exactly 10 digits</small>
+              <input v-model="form.mobile_number" placeholder="e.g. 9876543210" maxlength="10" @input="form.mobile_number = form.mobile_number.replace(/\D/g, '')" />
+              <small v-if="form.mobile_number && form.mobile_number.replace(/\D/g, '').length !== 10" class="req err">Must be exactly 10 digits</small>
             </div>
           </div>
 
@@ -70,19 +67,9 @@
             <button class="btn-outline" @click="showPasswordForm = !showPasswordForm" type="button">
               <i class="fas fa-key"></i> {{ showPasswordForm ? 'Hide Password Form' : 'Change Password' }}
             </button>
-            
-            <template v-if="user?.is_profile_complete">
-              <button v-if="!isEditing" class="btn-outline" @click="isEditing = true" type="button">
-                <i class="fas fa-edit"></i> Edit Details
-              </button>
-              <button v-if="isEditing" class="btn-outline" @click="cancelEdit" type="button">
-                <i class="fas fa-times"></i> Cancel
-              </button>
-            </template>
-
-            <button v-if="!user?.is_profile_complete || isEditing" class="save-btn" @click="saveProfile" :disabled="saving">
+            <button class="save-btn" @click="saveProfile" :disabled="saving">
               <i class="fas fa-spinner fa-spin" v-if="saving"></i>
-              {{ saving ? 'Saving...' : (!user?.is_profile_complete ? 'Complete Profile' : 'Save Changes') }}
+              {{ saving ? 'Saving Changes...' : 'Update Profile' }}
             </button>
           </div>
         </div>
@@ -95,7 +82,7 @@
           <h3>Account Security</h3>
         </div>
         <div class="form-body">
-          <p class="section-hint">Update your account password. Ensure it's strong and unique.</p>
+          <p class="section-hint">Update your admin account password. Ensure it's strong and unique.</p>
           <div class="grid-2">
             <div class="form-group">
               <label>Current Password</label>
@@ -144,20 +131,6 @@ import api from '../../api/client'
 import { useNotifications } from '../../composables/useNotifications'
 
 const user = ref<any>(null)
-const isEditing = ref(false)
-const isFormDisabled = computed(() => user.value?.is_profile_complete && !isEditing.value)
-
-function cancelEdit() {
-  isEditing.value = false
-  if (user.value) {
-    form.value = {
-      name: user.value.name || '',
-      designation: user.value.designation || '',
-      company_name: user.value.company_name || '',
-      mobile_number: user.value.mobile_number || ''
-    }
-  }
-}
 const form = ref({
   name: '',
   designation: '',
@@ -212,7 +185,6 @@ async function saveProfile() {
     // Update local storage user if needed
     const local = JSON.parse(localStorage.getItem('user') || '{}')
     localStorage.setItem('user', JSON.stringify({ ...local, name: res.data.name }))
-    isEditing.value = false
   } catch (err: any) {
     console.error(err)
     notify('Update Failed', err.response?.data?.error || 'Could not save profile.', 'ERROR')
@@ -262,7 +234,6 @@ onMounted(fetchProfile)
   display: flex; align-items: center; gap: 8px;
 }
 .status-badge.complete { background: #dcfce7; color: #15803d; }
-.status-badge.incomplete { background: #fef3c7; color: #b45309; }
 
 /* ─── Profile Grid ───────────────────────────────────────────── */
 .profile-grid {
@@ -274,46 +245,46 @@ onMounted(fetchProfile)
 }
 
 .profile-card {
-  background: white; border-radius: 20px; border: 1px solid rgba(61, 90, 128, 0.1);
-  overflow: hidden; box-shadow: 0 4px 20px rgba(61, 90, 128, 0.04);
+  background: white; border-radius: 20px; border: 1px solid rgba(47, 125, 101, 0.1);
+  overflow: hidden; box-shadow: 0 4px 20px rgba(47, 125, 101, 0.04);
 }
 
 /* ─── Basic Info ────────────────────────────────────────────── */
 .basic-info {
   display: flex; flex-direction: column; align-items: center; padding: 40px 24px; text-align: center;
-  background: linear-gradient(180deg, #f0f4fa 0%, #ffffff 100%);
+  background: linear-gradient(180deg, #f0faf5 0%, #ffffff 100%);
 }
 .avatar-large {
   width: 100px; height: 100px; border-radius: 50%;
-  background: linear-gradient(135deg, #e8f0fb, #dbe6f6);
-  color: #3d5a80; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #e6f5ee, #d6ede3);
+  color: #2f7d65; display: flex; align-items: center; justify-content: center;
   font-size: 40px; margin-bottom: 24px; border: 4px solid #fff;
-  box-shadow: 0 4px 16px rgba(61, 90, 128, 0.12);
+  box-shadow: 0 4px 16px rgba(47, 125, 101, 0.12);
 }
 .user-meta h2 { font-size: 20px; font-weight: 800; color: #1e293b; margin: 0; }
 .user-meta .email { font-size: 14px; color: #64748b; margin: 4px 0 16px; }
 .role-pill {
-  display: inline-block; padding: 4px 12px; background: rgba(61, 90, 128, 0.1); color: #3d5a80;
+  display: inline-block; padding: 4px 12px; background: rgba(47, 125, 101, 0.1); color: #2f7d65;
   border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase;
-  margin-bottom: 24px; border: 1px solid rgba(61, 90, 128, 0.15);
+  margin-bottom: 24px; border: 1px solid rgba(47, 125, 101, 0.15);
 }
 .public-id {
-  background: rgba(61, 90, 128, 0.04); padding: 10px 16px; border-radius: 12px;
-  border: 1px solid rgba(61, 90, 128, 0.08);
+  background: rgba(47, 125, 101, 0.04); padding: 10px 16px; border-radius: 12px;
+  border: 1px solid rgba(47, 125, 101, 0.08);
 }
 .public-id .label { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; display: block; margin-bottom: 2px; }
-.public-id .value { font-family: monospace; font-size: 14px; font-weight: 700; color: #3d5a80; }
+.public-id .value { font-family: monospace; font-size: 14px; font-weight: 700; color: #2f7d65; }
 
 /* ─── Form Info ─────────────────────────────────────────────── */
 .form-info {
   display: flex; flex-direction: column; flex: 1 0 auto;
 }
 .form-info .card-header {
-  padding: 16px 24px; background: linear-gradient(135deg, #f6f9fd, #eef3fa);
-  border-bottom: 1px solid rgba(61, 90, 128, 0.08);
+  padding: 16px 24px; background: linear-gradient(135deg, #f5fbf7, #edf7f2);
+  border-bottom: 1px solid rgba(47, 125, 101, 0.08);
   display: flex; align-items: center; gap: 12px;
 }
-.form-info .card-header i { color: #3d5a80; }
+.form-info .card-header i { color: #2f7d65; }
 .form-info .card-header h3 { font-size: 15px; font-weight: 700; color: #1e293b; margin: 0; }
 
 .form-body { padding: 24px; display: flex; flex-direction: column; flex: 1; }
@@ -325,27 +296,26 @@ onMounted(fetchProfile)
   padding: 12px 16px; border: 1.5px solid #e2e8f0; border-radius: 10px;
   font-size: 14px; outline: none; transition: border-color 0.2s, box-shadow 0.2s;
 }
-.form-group input:focus { border-color: #3d5a80; box-shadow: 0 0 0 3px rgba(61, 90, 128, 0.08); }
-.form-group input:disabled { background: #f8fafc; color: #94a3b8; cursor: not-allowed; }
+.form-group input:focus { border-color: #2f7d65; box-shadow: 0 0 0 3px rgba(47, 125, 101, 0.08); }
 .form-group .req { font-size: 11px; color: #f59e0b; font-weight: 500; }
 .form-group .req.err { color: #ef4444; }
 
-.form-footer { margin-top: auto; padding-top: 24px; border-top: 1px solid #f1f5f9; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; }
+.form-footer { margin-top: auto; padding-top: 24px; border-top: 1px solid #f1f5f9; display: flex; justify-content: flex-end; gap: 12px; }
 .save-btn {
-  padding: 12px 24px; background: #3d5a80; color: white; border: none;
+  padding: 12px 24px; background: #2f7d65; color: white; border: none;
   border-radius: 10px; font-weight: 700; cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
   display: inline-flex; align-items: center; gap: 10px;
 }
-.save-btn:hover:not(:disabled) { background: #293241; transform: translateY(-1px); box-shadow: 0 4px 14px rgba(61, 90, 128, 0.25); }
+.save-btn:hover:not(:disabled) { background: #235c4a; transform: translateY(-1px); box-shadow: 0 4px 14px rgba(47, 125, 101, 0.25); }
 .save-btn:disabled { opacity: 0.7; cursor: not-allowed; }
 
 .btn-outline {
-  padding: 12px 24px; background: white; color: #3d5a80; border: 1.5px solid rgba(61, 90, 128, 0.15);
+  padding: 12px 24px; background: white; color: #2f7d65; border: 1.5px solid rgba(47, 125, 101, 0.15);
   border-radius: 10px; font-weight: 700; cursor: pointer; transition: all 0.2s;
   display: inline-flex; align-items: center; gap: 10px;
 }
-.btn-outline:hover { border-color: #3d5a80; background: rgba(61, 90, 128, 0.04); }
+.btn-outline:hover { border-color: #2f7d65; background: rgba(47, 125, 101, 0.04); }
 
 /* ─── Security Card ─────────────────────────────────────────── */
 .security-card { margin-top: 0; }
@@ -357,7 +327,7 @@ onMounted(fetchProfile)
   position: absolute; right: 12px; background: none; border: none;
   color: #94a3b8; cursor: pointer; padding: 4px; transition: color 0.2s;
 }
-.peek-btn:hover { color: #3d5a80; }
+.peek-btn:hover { color: #2f7d65; }
 
 .btn-security {
   padding: 12px 24px; background: #ef4444; color: white; border: none;

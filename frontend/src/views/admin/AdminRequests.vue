@@ -8,78 +8,123 @@
         <p class="page-sub">Review and approve role and deletion requests</p>
       </div>
       <div class="header-badges">
-        <span class="count-badge pending">{{ pendingCount }} Pending</span>
+        <span class="count-badge pending">{{ pendingRequests.length }} Pending</span>
       </div>
     </div>
 
-    <!-- FILTER TABS -->
-    <div class="tab-bar">
-      <button
-        v-for="t in tabs" :key="t.val"
-        :class="['tab-btn', { active: activeTab === t.val }]"
-        @click="activeTab = t.val"
-      >
-        {{ t.label }}
-        <span class="tab-count" v-if="countFor(t.val) > 0">{{ countFor(t.val) }}</span>
-      </button>
-    </div>
+    <!-- LOADING -->
+    <div v-if="loading" class="loading-state"><i class="fas fa-spinner fa-spin"></i> Loading requests…</div>
 
-    <!-- TABLE -->
-    <div class="table-card">
-      <div v-if="loading" class="loading-state"><i class="fas fa-spinner fa-spin"></i> Loading requests…</div>
-      <table v-else class="data-table">
-        <thead>
-          <tr>
-            <th>Type</th>
-            <th>Request ID</th>
-            <th>Target / Record</th>
-            <th>Requested By</th>
-            <th>Status</th>
-            <th>Submitted</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="filtered.length === 0">
-            <td colspan="6" class="empty-row">No requests in this category.</td>
-          </tr>
-          <tr v-for="req in filtered" :key="req.type + req.id" class="data-row">
-            <td>
-              <span :class="['type-badge', req.type.toLowerCase()]">
-                {{ req.type === 'DELETE' ? 'Deletion' : (req.type === 'ACCESS' ? 'Access Upgrade' : 'Role Change') }}
+    <!-- KANBAN BOARD -->
+    <div v-else class="kanban-board">
+
+      <!-- PENDING COLUMN -->
+      <div class="kanban-col">
+        <div class="col-header pending">
+          <div class="col-title"><i class="fas fa-clock"></i><span>Pending</span></div>
+          <span class="col-count">{{ pendingRequests.length }}</span>
+        </div>
+        <div class="col-body">
+          <div v-if="pendingRequests.length === 0" class="col-empty">
+            <i class="fas fa-check-circle"></i><span>All caught up!</span>
+          </div>
+          <div v-for="req in pendingRequests" :key="req.type + req.id" class="kanban-card">
+            <div class="card-top">
+              <span :class="['type-chip', req.type.toLowerCase()]">
+                {{ req.type === 'DELETE' ? 'Deletion' : (req.type === 'ACCESS' ? 'Access' : 'Role') }}
               </span>
-            </td>
-            <td><span class="badge-id">#{{ req.id }}</span></td>
-            <td>
-              <span class="badge-id green" v-if="req.type === 'DELETE' || req.type === 'ACCESS'">{{ req.record_id }}</span>
-              <span class="bold" v-else>To {{ req.requested_role }}</span>
-            </td>
-            <td class="bold">
-              {{ (req.type === 'DELETE' || req.type === 'ACCESS') ? (req.user_name || req.requested_by) : (req.user_name + ' (' + req.user_id + ')') }}
-            </td>
-            <td>
-              <span :class="['status-badge', req.status.toLowerCase()]">
-                {{ req.status }}
+              <span class="card-id">#{{ req.id }}</span>
+            </div>
+            <div class="card-target">
+              <i :class="['fas', req.type === 'ROLE' ? 'fa-user-tag' : 'fa-file-alt']"></i>
+              {{ req.type === 'ROLE' ? 'To ' + req.requested_role : 'Record ' + req.record_id }}
+            </div>
+            <div class="card-user">
+              <i class="fas fa-user"></i>
+              {{ (req.type === 'DELETE' || req.type === 'ACCESS') ? (req.user_name || req.requested_by) : req.user_name }}
+            </div>
+            <div class="card-date">
+              <i class="fas fa-calendar-alt"></i> {{ formatDate(req.created_at) }}
+            </div>
+            <div class="card-actions">
+              <button class="action-pill approve" @click="review(req, 'APPROVE')" :disabled="reviewing === req.type + req.id">
+                <i class="fas fa-check"></i> Approve
+              </button>
+              <button class="action-pill reject" @click="review(req, 'REJECT')" :disabled="reviewing === req.type + req.id">
+                <i class="fas fa-times"></i> Reject
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- APPROVED COLUMN -->
+      <div class="kanban-col">
+        <div class="col-header approved">
+          <div class="col-title"><i class="fas fa-check-circle"></i><span>Approved</span></div>
+          <span class="col-count">{{ approvedRequests.length }}</span>
+        </div>
+        <div class="col-body">
+          <div v-if="approvedRequests.length === 0" class="col-empty">
+            <i class="fas fa-inbox"></i><span>No approved requests</span>
+          </div>
+          <div v-for="req in approvedRequests" :key="req.type + req.id" class="kanban-card approved">
+            <div class="card-top">
+              <span :class="['type-chip', req.type.toLowerCase()]">
+                {{ req.type === 'DELETE' ? 'Deletion' : (req.type === 'ACCESS' ? 'Access' : 'Role') }}
               </span>
-            </td>
-            <td class="muted">{{ formatDate(req.created_at) }}</td>
-            <td>
-              <div class="action-btns" v-if="req.status === 'PENDING'">
-                <button class="action-pill approve" @click="review(req, 'APPROVE')" :disabled="reviewing === req.type + req.id">
-                  <i class="fas fa-check"></i> Approve
-                </button>
-                <button class="action-pill reject" @click="review(req, 'REJECT')" :disabled="reviewing === req.type + req.id">
-                  <i class="fas fa-times"></i> Reject
-                </button>
-              </div>
-              <span v-else class="muted">—</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+              <span class="card-id">#{{ req.id }}</span>
+            </div>
+            <div class="card-target">
+              <i :class="['fas', req.type === 'ROLE' ? 'fa-user-tag' : 'fa-file-alt']"></i>
+              {{ req.type === 'ROLE' ? 'To ' + req.requested_role : 'Record ' + req.record_id }}
+            </div>
+            <div class="card-user">
+              <i class="fas fa-user"></i>
+              {{ (req.type === 'DELETE' || req.type === 'ACCESS') ? (req.user_name || req.requested_by) : req.user_name }}
+            </div>
+            <div class="card-date">
+              <i class="fas fa-calendar-alt"></i> {{ formatDate(req.created_at) }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- REJECTED COLUMN -->
+      <div class="kanban-col">
+        <div class="col-header rejected">
+          <div class="col-title"><i class="fas fa-times-circle"></i><span>Rejected</span></div>
+          <span class="col-count">{{ rejectedRequests.length }}</span>
+        </div>
+        <div class="col-body">
+          <div v-if="rejectedRequests.length === 0" class="col-empty">
+            <i class="fas fa-inbox"></i><span>No rejected requests</span>
+          </div>
+          <div v-for="req in rejectedRequests" :key="req.type + req.id" class="kanban-card rejected">
+            <div class="card-top">
+              <span :class="['type-chip', req.type.toLowerCase()]">
+                {{ req.type === 'DELETE' ? 'Deletion' : (req.type === 'ACCESS' ? 'Access' : 'Role') }}
+              </span>
+              <span class="card-id">#{{ req.id }}</span>
+            </div>
+            <div class="card-target">
+              <i :class="['fas', req.type === 'ROLE' ? 'fa-user-tag' : 'fa-file-alt']"></i>
+              {{ req.type === 'ROLE' ? 'To ' + req.requested_role : 'Record ' + req.record_id }}
+            </div>
+            <div class="card-user">
+              <i class="fas fa-user"></i>
+              {{ (req.type === 'DELETE' || req.type === 'ACCESS') ? (req.user_name || req.requested_by) : req.user_name }}
+            </div>
+            <div class="card-date">
+              <i class="fas fa-calendar-alt"></i> {{ formatDate(req.created_at) }}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- CONFIRM MODAL -->
+    <teleport to="body">
     <div class="modal-overlay" v-if="confirmModal" @click.self="confirmModal = null">
       <div class="modal modal-sm">
         <div class="modal-header">
@@ -105,7 +150,7 @@
         <div class="modal-footer">
           <button class="btn-ghost" @click="confirmModal = null">Cancel</button>
           <button
-            :class="confirmModal.action === 'APPROVE' ? 'btn-danger' : 'btn-primary'"
+            :class="confirmModal.action === 'APPROVE' ? 'btn-primary' : 'btn-danger'"
             @click="doReview"
             :disabled="reviewing !== null"
           >
@@ -114,6 +159,7 @@
         </div>
       </div>
     </div>
+    </teleport>
 
   </div>
 </template>
@@ -127,27 +173,10 @@ const { notify } = useNotifications()
 const requests = ref<any[]>([])
 const loading  = ref(false)
 const reviewing = ref<string | null>(null)
-const activeTab = ref('ALL')
 
-const tabs = [
-  { val: 'ALL', label: 'All' },
-  { val: 'PENDING', label: 'Pending' },
-  { val: 'APPROVED', label: 'Approved' },
-  { val: 'REJECTED', label: 'Rejected' },
-]
-
-const filtered = computed(() =>
-  activeTab.value === 'ALL'
-    ? requests.value
-    : requests.value.filter(r => r.status === activeTab.value)
-)
-
-const pendingCount = computed(() => requests.value.filter(r => r.status === 'PENDING').length)
-
-function countFor(tab: string) {
-  if (tab === 'ALL') return 0
-  return requests.value.filter(r => r.status === tab).length
-}
+const pendingRequests = computed(() => requests.value.filter(r => r.status === 'PENDING'))
+const approvedRequests = computed(() => requests.value.filter(r => r.status === 'APPROVED'))
+const rejectedRequests = computed(() => requests.value.filter(r => r.status === 'REJECTED'))
 
 async function fetchRequests() {
   loading.value = true
@@ -211,7 +240,6 @@ async function doReview() {
   }
 }
 
-
 onMounted(fetchRequests)
 </script>
 
@@ -226,85 +254,100 @@ onMounted(fetchRequests)
 .page-title  { font-size: 22px; font-weight: 700; color: #1a2e1a; margin: 0; }
 .page-sub    { font-size: 13px; color: #7a9a7a; margin: 4px 0 0; }
 
-.count-badge {
-  padding: 5px 14px; border-radius: 999px; font-size: 12px; font-weight: 700;
-}
+.count-badge { padding: 5px 14px; border-radius: 999px; font-size: 12px; font-weight: 700; }
 .count-badge.pending { background: #fef3cd; color: #b45309; }
 
-/* ─── Tabs ───────────────────────────────────────────────────── */
-.tab-bar { display: flex; gap: 8px; }
-.tab-btn {
-  padding: 8px 18px; border-radius: 999px; border: 1.5px solid #e0e0e0;
-  background: white; font-size: 13px; font-weight: 500; cursor: pointer;
-  display: flex; align-items: center; gap: 6px;
-  transition: all 0.2s; color: #555;
-}
-.tab-btn.active { background: #2f7d65; color: white; border-color: #2f7d65; }
-.tab-btn:hover:not(.active) { border-color: #2f7d65; color: #2f7d65; }
-.tab-count {
-  background: rgba(255,255,255,0.25); border-radius: 999px;
-  padding: 1px 7px; font-size: 11px;
-}
-.tab-btn:not(.active) .tab-count { background: #f0f0f0; color: #555; }
+.loading-state { text-align: center; padding: 60px; color: #5a8a6a; font-size: 15px; }
 
-/* ─── Table ─────────────────────────────────────────────────── */
-.table-card {
-  background: #fff; border-radius: 20px;
-  border: 1.5px solid #e8f0ea; overflow: hidden;
-  animation: fadeInUp 0.4s ease 0.1s both;
+/* ─── Kanban Board ───────────────────────────────────────────── */
+.kanban-board {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+  min-height: 400px; animation: fadeInUp 0.4s ease 0.1s both;
 }
-.loading-state { text-align: center; padding: 40px; color: #999; font-size: 14px; }
-.data-table { width: 100%; border-collapse: collapse; }
-.data-table thead tr { background: #f5fbf7; }
-.data-table th {
-  padding: 13px 16px; text-align: left; font-size: 11px;
-  font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
-  color: #5a8a6a; border-bottom: 1.5px solid #e0f0e8;
-}
-.data-row { border-bottom: 1px solid #f0f5f1; transition: background 0.15s; }
-.data-row:hover { background: #f9fdfb; }
-.data-table td { padding: 13px 16px; font-size: 13px; color: #2a3a2a; }
-.empty-row { text-align: center; color: #aaa; padding: 40px; }
-.bold  { font-weight: 600; }
-.muted { color: #888; font-size: 12px; }
 
-.badge-id {
-  background: #edf7f2; color: #2f7d65; border-radius: 8px;
-  padding: 3px 9px; font-size: 11px; font-weight: 700; font-family: monospace;
+.kanban-col {
+  background: rgba(47, 125, 101, 0.03); border-radius: 20px;
+  border: 1px solid rgba(47, 125, 101, 0.08);
+  display: flex; flex-direction: column; min-height: 300px;
+  overflow: hidden;
 }
-.badge-id.green { background: #edf7f2; color: #256554; }
 
-.status-badge {
-  padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 700;
+.col-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 16px 20px; border-bottom: 1px solid rgba(47, 125, 101, 0.08);
 }
-.status-badge.pending  { background: #fef3cd; color: #b45309; }
-.status-badge.approved { background: #dcfce7; color: #15803d; }
-.status-badge.rejected { background: #fee2e2; color: #b91c1c; }
+.col-header.pending { background: linear-gradient(135deg, #fffbeb, #fef3c7); }
+.col-header.approved { background: linear-gradient(135deg, #f0fdf4, #dcfce7); }
+.col-header.rejected { background: linear-gradient(135deg, #fef2f2, #fee2e2); }
 
-.type-badge {
-  padding: 3px 8px; border-radius: 6px; font-size: 10px; font-weight: 800; text-transform: uppercase;
+.col-title { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 700; }
+.col-header.pending .col-title { color: #92400e; }
+.col-header.approved .col-title { color: #166534; }
+.col-header.rejected .col-title { color: #991b1b; }
+
+.col-count { padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; }
+.col-header.pending .col-count { background: rgba(180, 83, 9, 0.15); color: #92400e; }
+.col-header.approved .col-count { background: rgba(22, 101, 52, 0.15); color: #166534; }
+.col-header.rejected .col-count { background: rgba(153, 27, 27, 0.15); color: #991b1b; }
+
+.col-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; overflow-y: auto; }
+
+.col-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  flex: 1; color: #94a3b8; gap: 10px; font-size: 13px; font-weight: 500; min-height: 150px;
 }
-.type-badge.delete { background: #fee2e2; color: #b91c1c; }
-.type-badge.role { background: #dbeafe; color: #1d4ed8; }
-.type-badge.access { background: #fef3e2; color: #d97706; }
+.col-empty i { font-size: 28px; opacity: 0.4; }
 
-/* ─── Action pills ───────────────────────────────────────────── */
-.action-btns { display: flex; gap: 6px; }
+/* ─── Kanban Cards ───────────────────────────────────────────── */
+.kanban-card {
+  background: white; border-radius: 14px; padding: 16px;
+  border: 1px solid rgba(47, 125, 101, 0.1);
+  box-shadow: 0 2px 8px rgba(47, 125, 101, 0.04);
+  display: flex; flex-direction: column; gap: 10px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  animation: fadeInUp 0.3s ease both;
+}
+.kanban-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(47, 125, 101, 0.08); }
+.kanban-card.approved { border-left: 3px solid #22c55e; }
+.kanban-card.rejected { border-left: 3px solid #ef4444; }
+
+.card-top { display: flex; justify-content: space-between; align-items: center; }
+.card-id { font-family: monospace; font-size: 12px; font-weight: 700; color: #94a3b8; }
+
+.type-chip { padding: 3px 10px; border-radius: 6px; font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.type-chip.delete { background: #fee2e2; color: #b91c1c; }
+.type-chip.role { background: #dbeafe; color: #1d4ed8; }
+.type-chip.access { background: #fef3c7; color: #92400e; }
+
+.card-target, .card-user {
+  display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #334155;
+}
+.card-target i, .card-user i { color: #94a3b8; font-size: 12px; width: 14px; }
+
+.card-date {
+  display: flex; align-items: center; gap: 8px; font-size: 11px; color: #94a3b8; font-weight: 500;
+  padding-top: 6px; border-top: 1px solid #f1f5f9;
+}
+
+.card-actions {
+  display: flex; gap: 8px; padding-top: 8px; border-top: 1px solid #f1f5f9;
+}
 .action-pill {
-  padding: 5px 12px; border-radius: 999px; border: none;
-  font-size: 12px; font-weight: 600; cursor: pointer;
-  display: inline-flex; align-items: center; gap: 5px;
+  flex: 1; padding: 7px 0; border-radius: 8px; border: none;
+  font-size: 12px; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
   transition: all 0.2s;
 }
 .action-pill:disabled { opacity: 0.5; cursor: not-allowed; }
 .action-pill.approve { background: #dcfce7; color: #15803d; }
 .action-pill.approve:hover:not(:disabled) { background: #16a34a; color: white; }
 .action-pill.reject  { background: #fee2e2; color: #b91c1c; }
-.action-pill.reject:hover:not(:disabled)  { background: #dc2626; color: white; }
+.action-pill.reject:hover:not(:disabled) { background: #dc2626; color: white; }
 
 /* ─── Modal ──────────────────────────────────────────────────── */
 .modal-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.35);
+  position: fixed; inset: 0; background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
   display: flex; align-items: center; justify-content: center;
   z-index: 100; animation: fadeIn 0.2s ease;
 }
@@ -312,7 +355,8 @@ onMounted(fetchRequests)
 .modal {
   background: white; border-radius: 22px; width: 680px; max-width: 95vw;
   max-height: 90vh; display: flex; flex-direction: column;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.2); animation: slideUp 0.25s ease;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.18), 0 0 0 1px rgba(47,125,101,0.08);
+  animation: slideUp 0.25s ease;
 }
 .modal-sm { width: 420px; }
 @keyframes slideUp {
@@ -321,27 +365,27 @@ onMounted(fetchRequests)
 }
 .modal-header {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 22px 26px 18px; border-bottom: 1px solid #eee;
+  padding: 22px 26px 18px; border-bottom: 1px solid #f1f5f9;
 }
 .modal-header h2 { font-size: 17px; font-weight: 700; color: #1a2e1a; margin: 0; }
 .modal-close {
-  width: 32px; height: 32px; border-radius: 50%; background: #f3f3f3;
-  border: none; cursor: pointer; font-size: 13px; color: #666; transition: background 0.2s;
+  width: 32px; height: 32px; border-radius: 50%; background: #f1f5f9;
+  border: none; cursor: pointer; font-size: 13px; color: #64748b; transition: all 0.2s;
 }
-.modal-close:hover { background: #ddd; }
+.modal-close:hover { background: #e2e8f0; color: #1e293b; transform: rotate(90deg); }
 .modal-body { padding: 22px 26px; }
 .confirm-text { font-size: 14px; color: #444; line-height: 1.6; margin: 0; }
 .modal-footer {
   display: flex; justify-content: flex-end; gap: 10px;
-  padding: 16px 26px 22px; border-top: 1px solid #eee;
+  padding: 16px 26px 22px; border-top: 1px solid #f1f5f9;
 }
 
 .btn-primary {
   background: #2f7d65; color: white; border: none;
   padding: 10px 22px; border-radius: 999px; font-size: 13px;
-  font-weight: 600; cursor: pointer; transition: background 0.2s;
+  font-weight: 600; cursor: pointer; transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
 }
-.btn-primary:hover { background: #256554; }
+.btn-primary:hover { background: #256554; box-shadow: 0 4px 14px rgba(47, 125, 101, 0.25); }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 .btn-danger {
   background: #dc2626; color: white; border: none;
@@ -351,9 +395,13 @@ onMounted(fetchRequests)
 .btn-danger:hover { background: #b91c1c; }
 .btn-danger:disabled { opacity: 0.6; cursor: not-allowed; }
 .btn-ghost {
-  background: #f3f3f3; color: #444; border: none;
+  background: rgba(47, 125, 101, 0.06); color: #2f7d65; border: none;
   padding: 10px 20px; border-radius: 999px; font-size: 13px;
-  font-weight: 600; cursor: pointer; transition: background 0.2s;
+  font-weight: 600; cursor: pointer; transition: all 0.2s;
 }
-.btn-ghost:hover { background: #e8e8e8; }
+.btn-ghost:hover { background: rgba(47, 125, 101, 0.12); color: #1a5c3a; }
+
+@media (max-width: 900px) {
+  .kanban-board { grid-template-columns: 1fr; }
+}
 </style>

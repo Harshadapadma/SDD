@@ -13,6 +13,7 @@ from django.db.models import Q
 from django.core.mail import send_mail
 from django.conf import settings
 
+from .email_templates import get_account_created_email, get_password_reset_email
 from .models import User
 from .serializers import (
     LoginSerializer,
@@ -24,6 +25,66 @@ from .serializers import (
 )
 
 from apps.notifications.models import Notification  # 🔥 added
+
+
+# -------------------------------
+# Forgot Password View
+# -------------------------------
+class ForgotPasswordView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get('email', '').strip().lower()
+
+        if not email:
+            return Response(
+                {'error': 'Email is required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            user = User.objects.get(email__iexact=email)
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'No account found with that email address.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+        reset_url = f'http://localhost:5173/set-password?uid={uid}&token={token}'
+
+        try:
+            subject, html_body = get_password_reset_email(
+                name=user.name,
+                email=user.email,
+                reset_url=reset_url,
+            )
+            send_mail(
+                subject=subject,
+                message=(
+                    f'Hello {user.name},\n\n'
+                    f'We received a request to reset your Negen SDD password.\n\n'
+                    f'Click the link below to set a new password:\n\n'
+                    f'{reset_url}\n\n'
+                    f'This link will expire after a short period.\n\n'
+                    f'If you did not request a password reset, please ignore this email.\n\n'
+                    f'Best,\nNegen SDD Team'
+                ),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                html_message=html_body,
+                fail_silently=False,
+            )
+        except Exception as e:
+            print(f'[ForgotPassword] Email send failed: {e}')
+            return Response(
+                {'error': 'Failed to send reset email. Please try again later.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        return Response({'message': 'Password reset link sent to your email.'})
 
 
 # -------------------------------
@@ -87,13 +148,21 @@ class CreateUserView(APIView):
 
             frontend_url = f"http://localhost:5173/set-password?uid={uid}&token={token}"
 
-            # Send Email
+            # Send HTML Email
             try:
+                subject, html_body = get_account_created_email(
+                    name=user.name,
+                    email=user.email,
+                    role=user.role,
+                    public_id=user.public_id,
+                    setup_url=frontend_url,
+                )
                 send_mail(
-                    subject="Welcome to Negen SDD - Set Your Password",
-                    message=f"Hello {user.name},\n\nAn account has been created for you on Negen SDD with the role '{user.role}'.\n\nPlease click the link below to set up your password and access your vault:\n\n{frontend_url}\n\nIf you did not request this, please ignore this email.\n\nBest,\nNegen SDD Team",
+                    subject=subject,
+                    message=f"Hello {user.name},\n\nYour account has been created. Please visit {frontend_url} to set your password.",
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     recipient_list=[user.email],
+                    html_message=html_body,
                     fail_silently=False,
                 )
             except Exception as e:
@@ -178,7 +247,7 @@ class UserListView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        queryset = User.objects.all().order_by('-created_at')
+        queryset = User.objects.exclude(role='ADMIN').order_by('-created_at')
 
         search = request.GET.get('search')
         if search:
@@ -337,7 +406,7 @@ class DashboardStatsView(APIView):
             return Response({"error": "Permission denied"}, status=403)
 
         # 1. Total counts
-        total_users = User.objects.count()
+        total_users = User.objects.exclude(role='ADMIN').count()
         total_records = Record.objects.count()
         
         pending_delete = DeleteRequest.objects.filter(status="PENDING").count()

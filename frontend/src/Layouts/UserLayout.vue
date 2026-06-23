@@ -39,7 +39,7 @@
 
       <!-- FOOTER -->
       <div class="sidebar-footer">
-        <div class="footer-avatar" @click="$router.push('/records')">{{ userInitial }}</div>
+        <div class="footer-avatar" @click="$router.push('/profile')" title="Go to Profile">{{ userInitial }}</div>
         <div class="footer-info" v-if="!isCollapsed">
           <span class="footer-name">{{ userName }}</span>
           <span class="footer-email">{{ userEmail }}</span>
@@ -66,56 +66,58 @@
             </button>
 
             <!-- ─── NOTIFICATION PANEL ─────────────────────── -->
-            <transition name="panel">
-              <div class="notif-panel" v-if="panelOpen">
+            <transition name="u-panel">
+              <div class="u-notif-panel" v-if="panelOpen">
 
                 <!-- Panel Header -->
-                <div class="panel-header">
-                  <span class="panel-title">Notifications</span>
-                  <div class="panel-actions">
+                <div class="u-panel-header">
+                  <span class="u-panel-title">Notifications</span>
+                  <div class="u-panel-actions">
                     <button
-                      class="panel-icon-btn"
+                      class="u-panel-icon-btn"
                       :title="isMuted ? 'Unmute popups' : 'Mute popups'"
                       @click="toggleMute"
                     >
                       <i :class="['fas', isMuted ? 'fa-bell-slash' : 'fa-bell']" :style="{ color: isMuted ? '#ef4444' : undefined }"></i>
                     </button>
-                    <button class="panel-icon-btn" title="Mark all read" @click="markAllRead" :disabled="unreadCount === 0">
+                    <button class="u-panel-icon-btn" title="Mark all read" @click="markAllRead" :disabled="unreadCount === 0">
                       <i class="fas fa-check-double"></i>
                     </button>
-                    <button class="panel-icon-btn" title="View all" @click="$router.push('/notifications'); panelOpen = false">
+                    <button class="u-panel-icon-btn" title="View all" @click="$router.push('/notifications'); panelOpen = false">
                       <i class="fas fa-arrow-up-right-from-square"></i>
                     </button>
                   </div>
                 </div>
 
                 <!-- Muted banner -->
-                <div class="muted-banner" v-if="isMuted">
+                <div class="u-muted-banner" v-if="isMuted">
                   <i class="fas fa-bell-slash"></i> Popups are muted
                 </div>
 
                 <!-- Panel Items -->
-                <div class="panel-body">
-                  <div v-if="notifications.length === 0" class="panel-empty">
+                <div class="u-panel-body">
+                  <div v-if="notifications.filter(n => !n.is_read).length === 0" class="u-panel-empty">
                     <i class="fas fa-bell-slash"></i>
-                    <p>No notifications yet</p>
+                    <p>No unread notifications</p>
                   </div>
 
                   <div
-                    v-for="n in notifications.slice(0, 20)"
+                    v-for="n in notifications.filter(n => !n.is_read).slice(0, 20)"
                     :key="n.id"
-                    :class="['panel-item', n.type.toLowerCase(), { unread: !n.is_read }]"
+                    :class="['u-panel-item', n.type.toLowerCase(), { unread: !n.is_read }]"
                     @click="markRead(n.id)"
                   >
-                    <div class="panel-item-icon">
+                    <div class="u-panel-item-icon">
                       <i :class="['fas', typeIcon(n.type)]"></i>
                     </div>
-                    <div class="panel-item-body">
-                      <div class="panel-item-title">{{ n.title }}</div>
-                      <div class="panel-item-msg">{{ n.message }}</div>
-                      <div class="panel-item-time">{{ formatTime(n.created_at) }}</div>
+                    <div class="u-panel-item-body">
+                      <div class="u-panel-item-header">
+                        <div class="u-panel-item-title">{{ n.title }}</div>
+                        <div class="u-panel-item-time">{{ formatTime(n.created_at) }}</div>
+                      </div>
+                      <div class="u-panel-item-msg">{{ n.message }}</div>
                     </div>
-                    <div class="panel-unread-dot" v-if="!n.is_read"></div>
+                    <div class="u-panel-unread-dot" v-if="!n.is_read"></div>
                   </div>
                 </div>
               </div>
@@ -135,20 +137,20 @@
 
     <!-- ─── TOAST POPUPS (top-right, below bell) ────────────── -->
     <teleport to="body">
-      <div class="toast-stack">
+      <div class="u-toast-stack">
         <div
           v-for="t in toasts"
           :key="t._tid"
-          :class="['toast', t.type.toLowerCase(), { leaving: t.leaving }]"
+          :class="['u-toast', t.type.toLowerCase(), { leaving: t.leaving }]"
         >
-          <div class="toast-icon">
+          <div class="u-toast-icon">
             <i :class="['fas', typeIcon(t.type)]"></i>
           </div>
-          <div class="toast-body">
-            <div class="toast-title">{{ t.title }}</div>
-            <div class="toast-msg">{{ t.message }}</div>
+          <div class="u-toast-body">
+            <div class="u-toast-title">{{ t.title }}</div>
+            <div class="u-toast-msg">{{ t.message }}</div>
           </div>
-          <button class="toast-close" @click="dismissToast(t._tid)">
+          <button class="u-toast-close" @click="dismissToast(t._tid)">
             <i class="fas fa-times"></i>
           </button>
         </div>
@@ -638,114 +640,225 @@ onUnmounted(stopPolling)
 /* ─── Notification Panel ────────────────────────────────────── */
 .bell-wrap { position: relative; }
 
-.notif-panel {
+.u-notif-panel {
+  --u-accent: 61, 90, 128;
   position: absolute;
   top: calc(100% + 12px);
   right: 0;
   width: 360px;
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.12), 0 2px 10px rgba(0,0,0,0.06);
-  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  background: linear-gradient(rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.92)), rgba(var(--u-accent), 0.4);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(var(--u-accent), 0.2);
+  box-shadow: 
+    0 8px 32px rgba(var(--u-accent), 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 0 12px 6px rgba(var(--u-accent), 0.20);
   z-index: 50;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   transform-origin: top right;
+  color: #1e293b;
 }
 
-.panel-enter-active, .panel-leave-active { transition: opacity 0.2s, transform 0.2s; }
-.panel-enter-from, .panel-leave-to { opacity: 0; transform: scale(0.96) translateY(-4px); }
+.u-panel-enter-active, .u-panel-leave-active { transition: opacity 0.2s, transform 0.2s; }
+.u-panel-enter-from, .u-panel-leave-to { opacity: 0; transform: scale(0.96) translateY(-4px); }
 
-.panel-header {
-  padding: 14px 18px; border-bottom: 1px solid #f1f5f9; display: flex;
-  justify-content: space-between; align-items: center; background: #f8fafc;
+.u-panel-header {
+  padding: 14px 18px;
+  background: rgba(var(--u-accent), 0.08);
+  border-bottom: 1px solid rgba(var(--u-accent), 0.15);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
-.panel-title { font-weight: 700; font-size: 14px; color: #1e293b; }
-.panel-actions { display: flex; gap: 4px; }
-.panel-icon-btn {
+.u-panel-title { font-weight: 700; font-size: 14px; color: #1e293b; }
+.user-title { color: #3d5a80; }
+.u-panel-actions { display: flex; gap: 4px; }
+.u-panel-icon-btn {
   background: none; border: none; padding: 6px; border-radius: 8px;
-  cursor: pointer; color: #64748b; transition: all 0.2s;
+  cursor: pointer; color: #3d5a80; transition: all 0.2s;
 }
-.panel-icon-btn:hover { background: #e2e8f0; color: #334155; }
-.panel-icon-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.u-panel-icon-btn:hover { background: rgba(61,90,128,0.12); }
+.u-panel-icon-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
-.muted-banner {
-  background: #fef2f2; color: #ef4444; padding: 8px 16px; font-size: 12px;
-  font-weight: 600; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #fee2e2;
+.u-muted-banner {
+  background: rgba(254, 226, 226, 0.8); color: #ef4444; padding: 8px 16px; font-size: 12px;
+  font-weight: 600; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(239, 68, 68, 0.2);
 }
 
-.panel-body { max-height: 400px; overflow-y: auto; }
-.panel-empty { padding: 40px; text-align: center; color: #cbd5e1; }
-.panel-empty i { font-size: 32px; margin-bottom: 10px; }
+.u-panel-body { max-height: 400px; overflow-y: auto; }
+.u-panel-empty { padding: 40px; text-align: center; color: #64748b; }
+.u-panel-empty i { font-size: 32px; margin-bottom: 10px; }
 
-.panel-item {
-  display: flex; padding: 14px 18px; gap: 12px; border-bottom: 1px solid #f8fafc;
-  cursor: pointer; transition: background 0.2s;
+.u-panel-item {
+  display: flex;
+  margin: 6px 10px;
+  padding: 10px 14px;
+  gap: 10px;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-radius: 20px;
+  border: 1px solid rgba(var(--u-accent), 0.15);
+  box-shadow: 
+    0 4px 16px rgba(var(--u-accent), 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.1);
 }
-.panel-item:hover { background: #f1f5f9; }
-.panel-item.unread { background: #eff6ff; }
 
-.panel-item-icon {
+.u-panel-item::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
+}
+
+.u-panel-item::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; width: 1px; height: 100%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.8), transparent, rgba(255, 255, 255, 0.3));
+}
+
+.u-panel-item:hover {
+  background: rgba(255, 255, 255, 0.85);
+  transform: translateY(-1px);
+  box-shadow: 
+    0 8px 24px rgba(var(--u-accent), 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.u-panel-item.unread {
+  background: rgba(255, 255, 255, 0.90);
+}
+
+.u-panel-item.info { background: rgba(59, 130, 246, 0.10); }
+.u-panel-item.success { background: rgba(34, 197, 94, 0.10); }
+.u-panel-item.warning { background: rgba(245, 158, 11, 0.10); }
+.u-panel-item.error { background: rgba(239, 68, 68, 0.10); }
+
+.u-panel-item-icon {
   width: 32px; height: 32px; border-radius: 10px; display: flex;
-  align-items: center; justify-content: center; flex-shrink: 0; font-size: 13px;
+  align-items: center; justify-content: center; flex-shrink: 0; font-size: 14px;
 }
-.panel-item.info .panel-item-icon { background: #e0f2fe; color: #0284c7; }
-.panel-item.success .panel-item-icon { background: #dcfce7; color: #15803d; }
-.panel-item.warning .panel-item-icon { background: #fef3cd; color: #b45309; }
-.panel-item.error .panel-item-icon { background: #fee2e2; color: #b91c1c; }
+.u-panel-item.info .u-panel-item-icon { background: #e0f2fe; color: #0284c7; }
+.u-panel-item.success .u-panel-item-icon { background: #dcfce7; color: #15803d; }
+.u-panel-item.warning .u-panel-item-icon { background: #fef3cd; color: #b45309; }
+.u-panel-item.error .u-panel-item-icon { background: #fee2e2; color: #b91c1c; }
 
-.panel-item-body { flex: 1; }
-.panel-item-title { font-size: 12px; font-weight: 700; color: #1e293b; margin-bottom: 2px; }
-.panel-item-msg { font-size: 12px; color: #475569; line-height: 1.4; margin-bottom: 4px; }
-.panel-item-time { font-size: 10px; color: #94a3b8; }
-.panel-unread-dot {
-  width: 8px; height: 8px; border-radius: 50%; background: #3d5a80;
-  margin-top: 4px; flex-shrink: 0;
+.u-panel-item-body { flex: 1; min-width: 0; }
+.u-panel-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 2px;
+}
+.u-panel-item-title { font-size: 12.5px; font-weight: 700; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.u-panel-item-msg { font-size: 12px; color: #475569; line-height: 1.4; margin-bottom: 4px; }
+.u-panel-item-time {
+  font-size: 10px;
+  color: #64748b;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0.8;
+}
+
+.u-panel-unread-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(var(--u-accent), 1);
+  box-shadow: 0 0 6px rgba(var(--u-accent), 0.6);
+  flex-shrink: 0;
 }
 
 /* ─── Toasts ────────────────────────────────────────────────── */
-.toast-stack {
+.u-toast-stack {
   position: fixed; top: 70px; right: 24px; z-index: 100;
   display: flex; flex-direction: column; gap: 10px; pointer-events: none;
 }
 
-.toast {
-  background: white; border-radius: 12px; padding: 14px 16px; width: 300px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.05);
-  display: flex; gap: 12px; align-items: flex-start; pointer-events: auto;
-  border-left: 4px solid #3d5a80;
-  animation: toastEnter 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+.u-toast {
+  pointer-events: auto;
+  width: 340px;
+  border-radius: 20px;
+  padding: 12px 16px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  transition: all 0.2s ease;
+  animation: utoastEnter 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
 
-.toast.leaving { animation: toastLeave 0.3s ease-in forwards; }
-
-.toast.info { border-left-color: #3b82f6; }
-.toast.success { border-left-color: #10b981; }
-.toast.warning { border-left-color: #f59e0b; }
-.toast.error { border-left-color: #ef4444; }
-
-.toast-icon { font-size: 18px; margin-top: 2px; }
-.toast.info .toast-icon { color: #3b82f6; }
-.toast.success .toast-icon { color: #10b981; }
-.toast.warning .toast-icon { color: #f59e0b; }
-.toast.error .toast-icon { color: #ef4444; }
-
-.toast-body { flex: 1; }
-.toast-title { font-weight: 700; font-size: 13px; color: #1e293b; margin-bottom: 4px; }
-.toast-msg { font-size: 12px; color: #64748b; line-height: 1.4; }
-
-.toast-close {
-  background: none; border: none; padding: 4px; color: #94a3b8;
-  cursor: pointer; border-radius: 4px; transition: background 0.2s, color 0.2s;
+.u-toast::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
 }
-.toast-close:hover { background: #f1f5f9; color: #1e293b; }
 
-@keyframes toastEnter {
+.u-toast::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; width: 1px; height: 100%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.8), transparent, rgba(255, 255, 255, 0.3));
+}
+
+.u-toast.leaving {
+  animation: utoastLeave 0.3s ease-in forwards;
+}
+
+.u-toast.info { --u-t-accent: 234, 179, 8; }
+.u-toast.success { --u-t-accent: 34, 197, 94; }
+.u-toast.warning { --u-t-accent: 245, 158, 11; }
+.u-toast.error { --u-t-accent: 239, 68, 68; }
+
+.u-toast {
+  background: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(var(--u-t-accent), 0.25);
+  box-shadow: 
+    0 12px 40px rgba(var(--u-t-accent), 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 0 14px 7px rgba(var(--u-t-accent), 0.15);
+}
+
+.u-toast-icon { width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+.u-toast.info .u-toast-icon { color: #a16207; background: #fef9c3; }
+.u-toast.success .u-toast-icon { color: #15803d; background: #dcfce7; }
+.u-toast.warning .u-toast-icon { color: #b45309; background: #fef3cd; }
+.u-toast.error .u-toast-icon { color: #b91c1c; background: #fee2e2; }
+
+.u-toast-body { flex: 1; }
+.u-toast-title { font-weight: 700; font-size: 13px; color: #1e293b; margin-bottom: 4px; }
+.u-toast-msg { font-size: 12px; color: #475569; line-height: 1.4; }
+
+.u-toast-close {
+  background: none; border: none; padding: 4px; color: #64748b;
+  cursor: pointer; border-radius: 6px; transition: background 0.2s, color 0.2s;
+}
+.u-toast-close:hover { background: rgba(0, 0, 0, 0.05); color: #1e293b; }
+
+@keyframes utoastEnter {
   from { opacity: 0; transform: translateX(40px) scale(0.95); }
   to   { opacity: 1; transform: translateX(0) scale(1); }
 }
-@keyframes toastLeave {
+@keyframes utoastLeave {
   from { opacity: 1; transform: translateX(0) scale(1); }
   to   { opacity: 0; transform: translateX(40px) scale(0.95); }
 }

@@ -29,89 +29,130 @@
         <i class="fas fa-search search-icon"></i>
         <input v-model="search" @input="fetchUsers" class="search-input" placeholder="Search by name, email, ID…" />
       </div>
-      <select v-model="roleFilter" @change="fetchUsers" class="filter-select">
-        <option value="">All Roles</option>
-        <option value="ADMIN">Admin</option>
-        <option value="COLLABORATOR">Collaborator</option>
-        <option value="VIEWER">Viewer</option>
-      </select>
+      <div class="filter-dropdown-wrap">
+        <button class="filter-btn" @click.stop="showRoleMenu = !showRoleMenu">
+          <i class="fas fa-filter"></i>
+          <span>{{ roleFilterLabel || 'All Roles' }}</span>
+          <i class="fas fa-chevron-down ms-auto"></i>
+        </button>
+
+        <transition name="menu-fade">
+          <div class="filter-menu" v-if="showRoleMenu" @click.stop>
+            <div class="menu-header">
+              <div class="menu-icon-bg"><i class="fas fa-users-cog"></i></div>
+              <div class="menu-info">
+                <div class="menu-title">Filter by Role</div>
+                <div class="menu-sub">{{ total }} total users</div>
+              </div>
+            </div>
+            
+            <div class="menu-divider"></div>
+            
+            <div class="menu-item" :class="{ active: roleFilter === '' }" @click="setRoleFilter('')">
+              <i class="fas fa-users"></i>
+              <span>All Roles</span>
+            </div>
+            
+            <div class="menu-divider"></div>
+            
+            <div class="menu-item" :class="{ active: roleFilter === 'ADMIN' }" @click="setRoleFilter('ADMIN')">
+              <i class="fas fa-user-shield"></i>
+              <span>Admin</span>
+            </div>
+            <div class="menu-item" :class="{ active: roleFilter === 'COLLABORATOR' }" @click="setRoleFilter('COLLABORATOR')">
+              <i class="fas fa-user-friends"></i>
+              <span>Collaborator</span>
+            </div>
+            <div class="menu-item" :class="{ active: roleFilter === 'VIEWER' }" @click="setRoleFilter('VIEWER')">
+              <i class="fas fa-eye"></i>
+              <span>Viewer</span>
+            </div>
+          </div>
+        </transition>
+      </div>
     </div>
 
-    <!-- TABLE -->
-    <div class="table-card">
-      <div v-if="loading" class="loading-state"><i class="fas fa-spinner fa-spin"></i> Loading users…</div>
-      <table v-else class="data-table">
-        <thead>
-          <tr>
-            <th>User ID</th>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Role</th>
-            <th>Status</th>
-            <th>Created</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="users.length === 0">
-            <td colspan="6" class="empty-row">No users found.</td>
-          </tr>
-          <tr v-for="u in users" :key="u.public_id" class="data-row">
-            <td><span class="badge-id">{{ u.public_id }}</span></td>
-            <td class="bold">{{ u.name }}</td>
-            <td class="muted">{{ u.email }}</td>
-            <td><span :class="['role-badge', u.role.toLowerCase()]">{{ u.role }}</span></td>
-            <td>
-              <div class="status-wrap">
-                <span :class="['status-dot', u.is_active ? 'active' : 'inactive']">
-                  {{ u.is_active ? 'Active' : 'Inactive' }}
-                </span>
-                <i 
-                  :class="['fas fa-id-card profile-indicator', u.is_profile_complete ? 'complete' : 'incomplete']"
-                  :title="u.is_profile_complete ? 'Profile Complete' : 'Profile Incomplete'"
-                ></i>
-              </div>
-            </td>
-            <td class="muted">{{ formatDate(u.created_at) }}</td>
-            <td>
-              <div class="action-btns" v-if="u.role !== 'ADMIN'">
-                <button class="icon-action view" title="View Profile" @click="viewProfile(u)">
-                  <i class="fas fa-eye"></i>
-                </button>
-                <div class="role-toggle">
-                  <label :class="{ active: u.role === 'COLLABORATOR' }">
-                    <input type="radio" :name="'role-'+u.public_id" value="COLLABORATOR" :checked="u.role === 'COLLABORATOR'" @click.prevent="promptRoleChange(u, 'COLLABORATOR')" />
-                    Coll.
-                  </label>
-                  <label :class="{ active: u.role === 'VIEWER' }">
-                    <input type="radio" :name="'role-'+u.public_id" value="VIEWER" :checked="u.role === 'VIEWER'" @click.prevent="promptRoleChange(u, 'VIEWER')" />
-                    View.
-                  </label>
-                </div>
-                <button 
-                  :class="['icon-action', u.is_blacklisted ? 'unblacklist' : 'blacklist']" 
-                  :title="u.is_blacklisted ? 'Unblacklist User' : 'Blacklist User'" 
-                  @click="promptBlacklist(u)"
-                >
-                  <i :class="['fas', u.is_blacklisted ? 'fa-user-check' : 'fa-user-slash']"></i>
-                </button>
-              </div>
-              <span v-else class="muted">—</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <!-- TILE GRID -->
+    <div v-if="loading" class="loading-state">
+      <i class="fas fa-spinner fa-spin"></i> Loading users…
+    </div>
+    
+    <div v-else-if="users.length === 0" class="empty-state">
+      <i class="fas fa-users-slash"></i>
+      <p>No users found.</p>
+    </div>
 
-      <!-- PAGINATION -->
-      <div class="pagination" v-if="totalPages > 1">
-        <button class="page-btn" :disabled="page === 1" @click="changePage(page - 1)">
-          <i class="fas fa-chevron-left"></i>
-        </button>
-        <span class="page-info">Page {{ page }} of {{ totalPages }}</span>
-        <button class="page-btn" :disabled="page === totalPages" @click="changePage(page + 1)">
-          <i class="fas fa-chevron-right"></i>
-        </button>
+    <div v-else class="tile-grid">
+      <div v-for="u in users" :key="u.public_id" class="user-tile">
+        <div class="tile-header">
+          <div class="user-avatar-small">{{ u.name.charAt(0).toUpperCase() }}</div>
+          <div class="user-info-main">
+            <div class="user-name">{{ u.name }}</div>
+            <div class="user-email">{{ u.email }}</div>
+          </div>
+          <span :class="['role-badge', u.role.toLowerCase()]">{{ u.role }}</span>
+        </div>
+        
+        <div class="tile-details">
+          <div class="tile-row">
+            <span class="badge-id">{{ u.public_id }}</span>
+          </div>
+          <div class="tile-row">
+            <div class="status-wrap">
+              <span :class="['status-dot', u.is_active ? 'active' : 'inactive']">
+                {{ u.is_active ? 'Active' : 'Inactive' }}
+              </span>
+              <i 
+                :class="['fas fa-id-card profile-indicator', u.is_profile_complete ? 'complete' : 'incomplete']"
+                :title="u.is_profile_complete ? 'Profile Complete' : 'Profile Incomplete'"
+              ></i>
+            </div>
+          </div>
+        </div>
+
+        <div class="tile-footer">
+          <div class="tile-meta">
+            <span class="tile-date"><i class="fas fa-calendar-alt"></i> {{ formatDate(u.created_at) }}</span>
+          </div>
+        </div>
+
+        <div class="tile-actions">
+          <template v-if="u.role !== 'ADMIN'">
+            <button class="icon-action view" title="View Profile" @click="viewProfile(u)">
+              <i class="fas fa-eye"></i>
+            </button>
+            <div class="role-toggle">
+              <label :class="{ active: u.role === 'COLLABORATOR' }">
+                <input type="radio" :name="'role-'+u.public_id" value="COLLABORATOR" :checked="u.role === 'COLLABORATOR'" @click.prevent="promptRoleChange(u, 'COLLABORATOR')" />
+                Coll.
+              </label>
+              <label :class="{ active: u.role === 'VIEWER' }">
+                <input type="radio" :name="'role-'+u.public_id" value="VIEWER" :checked="u.role === 'VIEWER'" @click.prevent="promptRoleChange(u, 'VIEWER')" />
+                View.
+              </label>
+            </div>
+            <button 
+              :class="['icon-action', u.is_blacklisted ? 'unblacklist' : 'blacklist']" 
+              :title="u.is_blacklisted ? 'Unblacklist User' : 'Blacklist User'" 
+              @click="promptBlacklist(u)"
+            >
+              <i :class="['fas', u.is_blacklisted ? 'fa-user-check' : 'fa-user-slash']"></i>
+            </button>
+          </template>
+          <span v-else class="muted">—</span>
+        </div>
       </div>
+    </div>
+
+    <!-- PAGINATION -->
+    <div class="pagination" v-if="totalPages > 1">
+      <button class="page-btn" :disabled="page === 1" @click="changePage(page - 1)">
+        <i class="fas fa-chevron-left"></i>
+      </button>
+      <span class="page-info">Page {{ page }} of {{ totalPages }}</span>
+      <button class="page-btn" :disabled="page === totalPages" @click="changePage(page + 1)">
+        <i class="fas fa-chevron-right"></i>
+      </button>
     </div>
 
     <!-- ─── CONFIRMATION MODAL ────────────────────────────────── -->
@@ -262,6 +303,22 @@ const pageSize = 10
 const search = ref('')
 const roleFilter = ref('')
 const loading = ref(false)
+const showRoleMenu = ref(false)
+
+const roleFilterLabel = computed(() => {
+  if (!roleFilter.value) return 'All Roles'
+  return roleFilter.value.charAt(0) + roleFilter.value.slice(1).toLowerCase()
+})
+
+function setRoleFilter(role: string) {
+  roleFilter.value = role
+  showRoleMenu.value = false
+  fetchUsers()
+}
+
+onMounted(() => {
+  window.addEventListener('click', () => { showRoleMenu.value = false })
+})
 
 const totalPages = computed(() => Math.ceil(total.value / pageSize))
 
@@ -417,11 +474,27 @@ onMounted(fetchUsers)
 .stats-row { display: flex; gap: 14px; }
 .stat-card {
   flex: 1; display: flex; align-items: center; gap: 14px;
-  background: #f5fbf7; border: 1.5px solid #e0f0e8;
+  background: linear-gradient(135deg, #f5fbf7 0%, #ecf5ef 100%);
+  border: 1.5px solid rgba(47, 125, 101, 0.12);
   border-radius: 16px; padding: 16px 20px;
-  animation: fadeInUp 0.4s ease 0.05s both;
+  box-shadow: 0 4px 12px rgba(47, 125, 101, 0.04);
+  transition: transform 0.3s cubic-bezier(0.4,0,0.2,1), box-shadow 0.3s ease;
+  position: relative; overflow: hidden;
 }
-.stat-icon { font-size: 20px; }
+.stat-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.8), transparent);
+}
+.stat-card:nth-child(1) { animation: fadeInUp 0.4s ease 0.05s both; }
+.stat-card:nth-child(2) { animation: fadeInUp 0.4s ease 0.10s both; }
+.stat-card:nth-child(3) { animation: fadeInUp 0.4s ease 0.15s both; }
+.stat-card:nth-child(4) { animation: fadeInUp 0.4s ease 0.20s both; }
+.stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(47, 125, 101, 0.1);
+}
+.stat-icon { font-size: 20px; transition: transform 0.2s ease; }
+.stat-card:hover .stat-icon { transform: scale(1.15); }
 .stat-icon.green  { color: #2f7d65; }
 .stat-icon.blue   { color: #3b82f6; }
 .stat-icon.orange { color: #f59e0b; }
@@ -432,14 +505,88 @@ onMounted(fetchUsers)
 /* ─── Toolbar ────────────────────────────────────────────────── */
 .toolbar { display: flex; gap: 12px; align-items: center; }
 .search-wrap { position: relative; flex: 1; max-width: 380px; }
-.search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #aaa; font-size: 13px; }
-.search-input {
-  width: 100%; padding: 10px 14px 10px 38px;
-  border-radius: 999px; border: 1.5px solid #e0e0e0;
-  background: #f7f7f7; font-size: 13px; outline: none;
-  transition: border-color 0.2s; box-sizing: border-box;
+.search-icon {
+  position: absolute; left: 18px; top: 50%; transform: translateY(-50%);
+  color: #5a8a6a; font-size: 15px; z-index: 1;
 }
-.search-input:focus { border-color: #2f7d65; background: #fff; }
+.search-input {
+  width: 100%; padding: 13px 16px 13px 48px; border-radius: 999px;
+  border: 1.5px solid rgba(47, 125, 101, 0.15); 
+  background: rgba(255, 255, 255, 0.7); 
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-size: 14px; font-weight: 500; color: #1a2e1a; outline: none;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+  box-sizing: border-box;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+.search-input::placeholder { color: #94a3b8; font-weight: 400; }
+.search-input:hover { background: rgba(255, 255, 255, 0.9); border-color: rgba(47, 125, 101, 0.3); }
+.search-input:focus { 
+  border-color: #2f7d65; background: #fff; 
+  box-shadow: 0 8px 20px rgba(47, 125, 101, 0.12), 0 0 0 4px rgba(47, 125, 101, 0.06);
+  transform: translateY(-1px);
+}
+
+/* ─── Premium Toolbar Dropdown ────────────────────────────── */
+.filter-dropdown-wrap { position: relative; }
+.filter-btn {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 18px; border-radius: 999px;
+  border: 1.5px solid #e2e8f0; background: white;
+  color: #475569; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all 0.25s;
+  min-width: 160px;
+}
+.filter-btn:hover { background: #f8fafc; border-color: #cbd5e1; transform: translateY(-1px); }
+.filter-btn .ms-auto { margin-left: auto; font-size: 11px; opacity: 0.6; }
+
+.filter-menu {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  width: 220px; background: rgba(248, 253, 250, 0.96); border-radius: 20px;
+  box-shadow: 0 15px 35px rgba(47, 125, 101, 0.12), 0 5px 15px rgba(0,0,0,0.05);
+  padding: 8px; z-index: 100;
+  border: 1px solid rgba(47, 125, 101, 0.15);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transform-origin: top right;
+  animation: menuIn 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+.menu-header { display: flex; align-items: center; gap: 12px; padding: 12px 14px 10px; }
+.menu-icon-bg {
+  width: 38px; height: 38px; border-radius: 12px;
+  background: #f1f5f9; color: #475569;
+  display: flex; align-items: center; justify-content: center; font-size: 16px;
+}
+.menu-info { display: flex; flex-direction: column; }
+.menu-title { font-size: 13px; font-weight: 700; color: #1e293b; }
+.menu-sub { font-size: 11px; color: #94a3b8; font-weight: 500; }
+
+.menu-divider { height: 1px; background: #f1f5f9; margin: 8px 0; }
+
+.menu-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px; border-radius: 12px;
+  cursor: pointer; transition: all 0.2s;
+  color: #475569;
+}
+.menu-item i { width: 16px; font-size: 14px; color: #94a3b8; transition: color 0.2s; }
+.menu-item span { font-size: 13px; font-weight: 600; flex: 1; }
+.menu-shortcut { font-size: 10px; color: #cbd5e1; font-weight: 700; opacity: 0.8; }
+
+.menu-item:hover { background: #ecfdf5; color: #059669; }
+.menu-item:hover i { color: #059669; }
+.menu-item.active { background: #f0fdf4; color: #15803d; }
+.menu-item.active i { color: #15803d; }
+
+@keyframes menuIn {
+  from { opacity: 0; transform: scale(0.95) translateY(-10px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.menu-fade-enter-active, .menu-fade-leave-active { transition: all 0.2s ease; }
+.menu-fade-enter-from, .menu-fade-leave-to { opacity: 0; transform: translateY(-8px); }
 .filter-select {
   padding: 10px 16px; border-radius: 999px; border: 1.5px solid #e0e0e0;
   font-size: 13px; outline: none; background: #f7f7f7; cursor: pointer;
@@ -451,42 +598,96 @@ onMounted(fetchUsers)
   background: #2f7d65; color: white; border: none;
   padding: 10px 20px; border-radius: 999px; font-size: 13px;
   font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;
-  transition: background 0.2s, transform 0.15s;
+  transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
 }
-.btn-primary:hover { background: #256554; transform: translateY(-1px); }
+.btn-primary:hover { background: #256554; transform: translateY(-1px); box-shadow: 0 4px 14px rgba(47, 125, 101, 0.25); }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 .btn-ghost {
-  background: #f3f3f3; color: #444; border: none;
+  background: rgba(47, 125, 101, 0.06); color: #2f7d65; border: none;
   padding: 10px 20px; border-radius: 999px; font-size: 13px;
-  font-weight: 600; cursor: pointer; transition: background 0.2s;
+  font-weight: 600; cursor: pointer; transition: all 0.2s;
 }
-.btn-ghost:hover { background: #e8e8e8; }
+.btn-ghost:hover { background: rgba(47, 125, 101, 0.12); color: #1a5c3a; }
 
-/* ─── Table ─────────────────────────────────────────────────── */
-.table-card {
-  background: #fff; border-radius: 20px;
-  border: 1.5px solid #e8f0ea; overflow: hidden;
-  animation: fadeInUp 0.4s ease 0.1s both;
+/* ─── Tile Grid ──────────────────────────────────────────────── */
+.tile-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 18px; animation: fadeInUp 0.4s ease 0.1s both;
 }
-.loading-state { text-align: center; padding: 40px; color: #999; font-size: 14px; }
-.data-table { width: 100%; border-collapse: collapse; }
-.data-table thead tr { background: #f5fbf7; }
-.data-table th {
-  padding: 13px 16px; text-align: left;
-  font-size: 11px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.5px; color: #5a8a6a; border-bottom: 1.5px solid #e0f0e8;
-}
-.data-row { border-bottom: 1px solid #f0f5f1; transition: background 0.15s; }
-.data-row:hover { background: #f9fdfb; }
-.data-table td { padding: 13px 16px; font-size: 13px; color: #2a3a2a; }
-.empty-row { text-align: center; color: #aaa; padding: 40px; }
-.bold { font-weight: 600; }
-.muted { color: #666; font-size: 12px; }
 
+.user-tile {
+  background: linear-gradient(135deg, #f9fdfa 0%, #f0f7f3 100%);
+  border-radius: 18px; padding: 0;
+  border: 1.5px solid rgba(47, 125, 101, 0.12);
+  box-shadow: 0 4px 12px rgba(47, 125, 101, 0.04);
+  display: flex; flex-direction: column;
+  transition: transform 0.3s cubic-bezier(0.4,0,0.2,1), box-shadow 0.3s ease;
+  overflow: hidden; animation: fadeInUp 0.4s ease both;
+  position: relative;
+}
+.user-tile::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1.5px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.9), transparent);
+  z-index: 1;
+}
+.user-tile:nth-child(1) { animation-delay: 0.05s; }
+.user-tile:nth-child(2) { animation-delay: 0.10s; }
+.user-tile:nth-child(3) { animation-delay: 0.15s; }
+.user-tile:nth-child(4) { animation-delay: 0.20s; }
+.user-tile:nth-child(n+5) { animation-delay: 0.25s; }
+
+.user-tile:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 30px rgba(47, 125, 101, 0.12);
+}
+
+.tile-header {
+  display: flex; align-items: center; gap: 14px;
+  padding: 18px 20px 14px;
+  background: rgba(47, 125, 101, 0.03);
+  border-bottom: 1px solid rgba(47, 125, 101, 0.06);
+}
+.user-avatar-small {
+  width: 40px; height: 40px; border-radius: 12px;
+  background: rgba(47, 125, 101, 0.1); color: #2f7d65;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 700; flex-shrink: 0;
+}
+.user-info-main { flex: 1; overflow: hidden; }
+.user-name {
+  font-size: 15px; font-weight: 700; color: #1a2e1a;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.user-email { font-size: 12px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.tile-details { padding: 14px 20px; display: flex; flex-direction: column; gap: 8px; }
+.tile-row { display: flex; align-items: center; justify-content: space-between; }
 .badge-id {
-  background: #edf7f2; color: #2f7d65; border-radius: 8px;
+  background: rgba(47, 125, 101, 0.08); color: #2f7d65; border-radius: 8px;
   padding: 3px 9px; font-size: 11px; font-weight: 700; font-family: monospace;
+  border: 1px solid rgba(47, 125, 101, 0.1);
 }
+
+.tile-footer {
+  padding: 12px 20px; border-top: 1px solid #f0f5f1;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.tile-meta { display: flex; justify-content: space-between; align-items: center; }
+.tile-date { font-size: 11px; color: #94a3b8; font-weight: 500; }
+
+.tile-actions {
+  display: flex; gap: 6px; padding: 12px 20px; border-top: 1px solid #f0f5f1; align-items: center; justify-content: flex-start;
+}
+
+.loading-state {
+  display: flex; align-items: center; justify-content: center;
+  padding: 60px 20px; color: #2f7d65; gap: 12px; font-size: 15px;
+}
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 80px 20px; color: #94a3b8; gap: 16px;
+}
+.empty-state i { font-size: 40px; opacity: 0.4; }
 
 .role-badge {
   padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600;
@@ -527,23 +728,23 @@ onMounted(fetchUsers)
 .icon-action {
   width: 28px; height: 28px; border-radius: 8px; border: none;
   cursor: pointer; font-size: 12px; display: flex; align-items: center;
-  justify-content: center; transition: background 0.2s, transform 0.15s;
+  justify-content: center; transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
 }
-.icon-action:hover { transform: scale(1.1); }
+.icon-action:hover { transform: scale(1.12); }
 .icon-action.blacklist { background: #fee2e2; color: #dc2626; }
-.icon-action.blacklist:hover { background: #dc2626; color: white; }
+.icon-action.blacklist:hover { background: #dc2626; color: white; box-shadow: 0 4px 10px rgba(220, 38, 38, 0.2); }
 
 .status-wrap { display: flex; align-items: center; gap: 8px; }
 .profile-indicator { font-size: 14px; }
 .profile-indicator.complete { color: #22c55e; }
 .profile-indicator.incomplete { color: #f59e0b; opacity: 0.6; }
 
-.icon-action.view { background: #f1f5f9; color: #3d5a80; }
-.icon-action.view:hover { background: #3d5a80; color: white; }
+.icon-action.view { background: rgba(61, 90, 128, 0.08); color: #3d5a80; }
+.icon-action.view:hover { background: #3d5a80; color: white; box-shadow: 0 4px 10px rgba(61, 90, 128, 0.2); }
 
 /* ─── Profile Modal ────────────────────────────────────────── */
 .profile-header-wrap { display: flex; align-items: center; gap: 20px; margin-bottom: 24px; padding-bottom: 24px; border-bottom: 1px solid #f1f5f9; }
-.avatar-circle { width: 64px; height: 64px; border-radius: 50%; background: #e0f2fe; color: #0369a1; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; }
+.avatar-circle { width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, #e6f5ee, #d6ede3); color: #2f7d65; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; box-shadow: 0 4px 12px rgba(47, 125, 101, 0.12); }
 .header-info h3 { font-size: 18px; font-weight: 800; color: #1e293b; margin: 0; }
 .header-info p { font-size: 14px; color: #64748b; margin: 2px 0 8px; }
 
@@ -582,7 +783,7 @@ onMounted(fetchUsers)
 .alert-box i { font-size: 16px; }
 
 .icon-action.unblacklist { background: #dcfce7; color: #16a34a; }
-.icon-action.unblacklist:hover { background: #16a34a; color: white; }
+.icon-action.unblacklist:hover { background: #16a34a; color: white; box-shadow: 0 4px 10px rgba(22, 163, 106, 0.2); }
 
 .btn-danger { background: #dc2626; color: white; border: none; }
 .btn-danger:hover { background: #b91c1c; }
@@ -601,7 +802,8 @@ onMounted(fetchUsers)
 
 /* ─── Modal ──────────────────────────────────────────────────── */
 .modal-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.35);
+  position: fixed; inset: 0; background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
   display: flex; align-items: center; justify-content: center;
   z-index: 100; animation: fadeIn 0.2s ease;
 }
@@ -609,7 +811,7 @@ onMounted(fetchUsers)
 .modal {
   background: white; border-radius: 22px; width: 680px; max-width: 95vw;
   max-height: 90vh; display: flex; flex-direction: column;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.2); animation: slideUp 0.25s ease;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.18), 0 0 0 1px rgba(47,125,101,0.08); animation: slideUp 0.25s ease;
 }
 .modal-sm { width: 440px; }
 @keyframes slideUp {
@@ -622,11 +824,10 @@ onMounted(fetchUsers)
 }
 .modal-header h2 { font-size: 17px; font-weight: 700; color: #1a2e1a; margin: 0; }
 .modal-close {
-  width: 32px; height: 32px; border-radius: 50%; background: #f3f3f3;
-  border: none; cursor: pointer; font-size: 13px; color: #666; transition: background 0.2s;
+  width: 32px; height: 32px; border-radius: 50%; background: #f1f5f9;
+  border: none; cursor: pointer; font-size: 13px; color: #64748b; transition: all 0.2s;
 }
-.modal-close:hover { background: #e2e8f0; color: #1e293b; }
-.modal-close:hover { background: #ddd; }
+.modal-close:hover { background: #e2e8f0; color: #1e293b; transform: rotate(90deg); }
 .modal-body { padding: 20px 26px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 14px; }
 .modal-footer {
   display: flex; justify-content: flex-end; gap: 10px;

@@ -10,7 +10,7 @@ class DeleteRequestStatus(models.TextChoices):
 
 
 class DeleteRequest(models.Model):
-    record = models.ForeignKey(Record, on_delete=models.CASCADE)
+    record = models.ForeignKey(Record, on_delete=models.SET_NULL, null=True, blank=True)
     requested_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="delete_requests")
     status = models.CharField(
         max_length=10,

@@ -43,65 +43,67 @@
       </div>
     </div>
 
-    <!-- TABLE -->
-    <div class="table-card">
-      <div v-if="loading" class="loading-state">
-        <i class="fas fa-spinner fa-spin"></i> Loading records…
-      </div>
+    <!-- TILE GRID -->
+    <div v-if="loading" class="loading-state">
+      <i class="fas fa-spinner fa-spin"></i> Loading records…
+    </div>
 
-      <table v-else class="data-table">
-        <thead>
-          <tr>
-            <th>Record ID</th>
-            <th>Name</th>
-            <th>PAN</th>
-            <th>Company</th>
-            <th>Date Received</th>
-            <th>Created By</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="records.length === 0">
-            <td colspan="7" class="empty-row">No records found.</td>
-          </tr>
-          <tr v-for="record in records" :key="record.public_id" class="data-row">
-            <td><span class="badge-id">{{ record.public_id }}</span></td>
-            <td class="bold">{{ record.name }}</td>
-            <td class="mono">{{ record.pan }}</td>
-            <td>{{ record.source_company }}</td>
-            <td>{{ formatDate(record.info_received_date) }}</td>
-            <td><span class="user-chip">{{ record.created_by }}</span></td>
-            <td>
-              <div class="action-btns">
-                <button class="icon-action view" title="View Details" @click="$router.push(`/records/${record.public_id}`)">
-                  <i class="fas fa-eye"></i>
-                </button>
-                <button class="icon-action edit" title="Edit" @click="openEdit(record)">
-                  <i class="fas fa-pen"></i>
-                </button>
-                <button class="icon-action assign" title="Assign Access" @click="openAssign(record)">
-                  <i class="fas fa-user-shield"></i>
-                </button>
-                <button class="icon-action delete" title="Delete" @click="deleteRecord(record)">
-                  <i class="fas fa-trash"></i>
-                </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <div v-else-if="records.length === 0" class="empty-state">
+      <i class="fas fa-inbox"></i>
+      <p>No records found.</p>
+    </div>
 
-      <!-- PAGINATION -->
-      <div class="pagination" v-if="totalPages > 1">
-        <button class="page-btn" :disabled="page === 1" @click="changePage(page - 1)">
-          <i class="fas fa-chevron-left"></i>
-        </button>
-        <span class="page-info">Page {{ page }} of {{ totalPages }}</span>
-        <button class="page-btn" :disabled="page === totalPages" @click="changePage(page + 1)">
-          <i class="fas fa-chevron-right"></i>
-        </button>
+    <div v-else class="tile-grid">
+      <div v-for="record in records" :key="record.public_id" class="record-tile">
+        <div class="tile-header">
+          <div class="tile-icon"><i class="fas fa-file-alt"></i></div>
+          <div class="tile-name">{{ record.name }}</div>
+        </div>
+        <div class="tile-details">
+          <div class="tile-row">
+            <i class="fas fa-id-card"></i>
+            <span class="tile-pan">{{ record.pan }}</span>
+          </div>
+          <div class="tile-row">
+            <i class="fas fa-building"></i>
+            <span>{{ record.source_company || '—' }}</span>
+          </div>
+        </div>
+        <div class="tile-footer">
+          <div class="tile-meta">
+            <span class="tile-badge">{{ record.public_id }}</span>
+            <span class="tile-date">{{ formatDate(record.info_received_date) }}</span>
+          </div>
+          <div class="tile-creator">
+            <i class="fas fa-user-circle"></i> {{ record.created_by }}
+          </div>
+        </div>
+        <div class="tile-actions">
+          <button class="icon-action view" title="View Details" @click="$router.push(`/records/${record.public_id}`)">
+            <i class="fas fa-eye"></i>
+          </button>
+          <button class="icon-action edit" title="Edit" @click="openEdit(record)">
+            <i class="fas fa-pen"></i>
+          </button>
+          <button class="icon-action assign" title="Assign Access" @click="openAssign(record)">
+            <i class="fas fa-user-shield"></i>
+          </button>
+          <button class="icon-action delete" title="Delete" @click="deleteRecord(record)">
+            <i class="fas fa-trash"></i>
+          </button>
+        </div>
       </div>
+    </div>
+
+    <!-- PAGINATION -->
+    <div class="pagination" v-if="totalPages > 1">
+      <button class="page-btn" :disabled="page === 1" @click="changePage(page - 1)">
+        <i class="fas fa-chevron-left"></i>
+      </button>
+      <span class="page-info">Page {{ page }} of {{ totalPages }}</span>
+      <button class="page-btn" :disabled="page === totalPages" @click="changePage(page + 1)">
+        <i class="fas fa-chevron-right"></i>
+      </button>
     </div>
 
     <!-- ─── CREATE RECORD MODAL ──────────────────────────────── -->
@@ -217,7 +219,10 @@
           <button class="modal-close" @click="showEdit = false"><i class="fas fa-times"></i></button>
         </div>
         <div class="modal-body">
-          <div class="form-grid">
+          <div v-if="editing && !editForm.name" class="loading-state">
+            <i class="fas fa-spinner fa-spin"></i> Loading record details…
+          </div>
+          <div class="form-grid" v-else>
             <div class="form-group">
               <label>Full Name</label>
               <input v-model="editForm.name" />
@@ -227,12 +232,28 @@
               <input v-model="editForm.designation" />
             </div>
             <div class="form-group">
+              <label>Employee Code</label>
+              <input v-model="editForm.employee_code" />
+            </div>
+            <div class="form-group">
               <label>PAN</label>
               <input v-model="editForm.pan" />
             </div>
             <div class="form-group">
               <label>Source Company</label>
               <input v-model="editForm.source_company" />
+            </div>
+            <div class="form-group">
+              <label>Date Received</label>
+              <input type="date" v-model="editForm.info_received_date" />
+            </div>
+            <div class="form-group">
+              <label>Disclosure Name</label>
+              <input v-model="editForm.disclosure_name" />
+            </div>
+            <div class="form-group">
+              <label>Disclosure Designation</label>
+              <input v-model="editForm.disclosure_designation" />
             </div>
             <div class="form-group full-width">
               <label>Information Details</label>
@@ -249,6 +270,27 @@
         </div>
       </div>
     </div>
+    </teleport>
+
+    <!-- ─── CONFIRM MODAL ────────────────────────────────────── -->
+    <teleport to="body">
+      <div class="modal-overlay" v-if="confirmDialog.show" @click.self="closeConfirm">
+        <div class="modal confirm-modal">
+          <div class="modal-header">
+            <h2>{{ confirmDialog.title }}</h2>
+            <button class="modal-close" @click="closeConfirm"><i class="fas fa-times"></i></button>
+          </div>
+          <div class="modal-body">
+            <p>{{ confirmDialog.message }}</p>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-ghost" @click="closeConfirm">Cancel</button>
+            <button class="btn-primary confirm-btn" @click="confirmAction">
+              Confirm
+            </button>
+          </div>
+        </div>
+      </div>
     </teleport>
 
   </div>
@@ -393,10 +435,20 @@ const editError = ref('')
 const editRecord = ref<any>(null)
 const editForm = ref<any>({})
 
-function openEdit(record: any) {
+async function openEdit(record: any) {
   editRecord.value = record
-  editForm.value = { ...record }
+  editForm.value = {}
   showEdit.value = true
+  editing.value = true  // show loading state while fetching
+  try {
+    const res = await api.get(`records/${record.public_id}/`)
+    editForm.value = { ...res.data }
+  } catch (e) {
+    notify('Error', 'Failed to load record details.', 'ERROR')
+    showEdit.value = false
+  } finally {
+    editing.value = false
+  }
 }
 
 async function saveEdit() {
@@ -415,16 +467,50 @@ async function saveEdit() {
   }
 }
 
-async function deleteRecord(record: any) {
-  if (!confirm(`Are you sure you want to delete record ${record.public_id}?`)) return
-  try {
-    await api.delete(`records/${record.public_id}/delete/`)
-    notify('Record Deleted', `Record ${record.public_id} has been removed.`, 'SUCCESS')
-    fetchRecords()
-  } catch (e) {
-    console.error(e)
-    notify('Error', 'Failed to delete record.', 'ERROR')
+// ─── Confirm Modal Logic ──────────────────────────────────────
+const confirmDialog = ref({
+  show: false,
+  title: '',
+  message: '',
+  onConfirm: null as (() => void) | null
+})
+
+function openConfirm(title: string, message: string, action: () => void) {
+  confirmDialog.value = {
+    show: true,
+    title,
+    message,
+    onConfirm: action
   }
+}
+
+function closeConfirm() {
+  confirmDialog.value.show = false
+  confirmDialog.value.onConfirm = null
+}
+
+function confirmAction() {
+  if (confirmDialog.value.onConfirm) {
+    confirmDialog.value.onConfirm()
+  }
+  closeConfirm()
+}
+
+function deleteRecord(record: any) {
+  openConfirm(
+    "Confirm Deletion",
+    `Are you sure you want to delete record ${record.public_id}?`,
+    async () => {
+      try {
+        await api.delete(`records/${record.public_id}/delete/`)
+        notify('Record Deleted', `Record ${record.public_id} has been removed.`, 'SUCCESS')
+        fetchRecords()
+      } catch (e) {
+        console.error(e)
+        notify('Error', 'Failed to delete record.', 'ERROR')
+      }
+    }
+  )
 }
 
 
@@ -449,11 +535,25 @@ onMounted(fetchRecords)
 .stats-row { display: flex; gap: 14px; }
 .stat-card {
   flex: 1; display: flex; align-items: center; gap: 14px;
-  background: #f5fbf7; border: 1.5px solid #e0f0e8;
+  background: linear-gradient(135deg, #f5fbf7 0%, #ecf5ef 100%);
+  border: 1.5px solid rgba(47, 125, 101, 0.12);
   border-radius: 16px; padding: 16px 20px;
-  animation: fadeInUp 0.4s ease 0.05s both;
+  box-shadow: 0 4px 12px rgba(47, 125, 101, 0.04);
+  transition: transform 0.3s cubic-bezier(0.4,0,0.2,1), box-shadow 0.3s ease;
+  position: relative; overflow: hidden;
 }
-.stat-icon { font-size: 22px; }
+.stat-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.8), transparent);
+}
+.stat-card:nth-child(1) { animation: fadeInUp 0.4s ease 0.05s both; }
+.stat-card:nth-child(2) { animation: fadeInUp 0.4s ease 0.12s both; }
+.stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(47, 125, 101, 0.1);
+}
+.stat-icon { font-size: 22px; transition: transform 0.2s ease; }
+.stat-card:hover .stat-icon { transform: scale(1.15); }
 .stat-icon.green { color: #2f7d65; }
 .stat-icon.blue { color: #3b82f6; }
 .stat-val   { font-size: 24px; font-weight: 700; color: #1a2e1a; }
@@ -462,78 +562,133 @@ onMounted(fetchRecords)
 /* ─── Toolbar ────────────────────────────────────────────────── */
 .toolbar { display: flex; gap: 12px; }
 .search-wrap { position: relative; flex: 1; max-width: 420px; }
-.search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #aaa; font-size: 13px; }
-.search-input {
-  width: 100%; padding: 10px 14px 10px 38px;
-  border-radius: 999px; border: 1.5px solid #e0e0e0;
-  background: #f7f7f7; font-size: 13px; outline: none;
-  transition: border-color 0.2s, width 0.3s;
-  box-sizing: border-box;
+.search-icon {
+  position: absolute; left: 18px; top: 50%; transform: translateY(-50%);
+  color: #5a8a6a; font-size: 15px; z-index: 1;
 }
-.search-input:focus { border-color: #2f7d65; background: #fff; }
+.search-input {
+  width: 100%; padding: 13px 16px 13px 48px; border-radius: 999px;
+  border: 1.5px solid rgba(47, 125, 101, 0.15); 
+  background: rgba(255, 255, 255, 0.7); 
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-size: 14px; font-weight: 500; color: #1a2e1a; outline: none;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+  box-sizing: border-box;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+.search-input::placeholder { color: #94a3b8; font-weight: 400; }
+.search-input:hover { background: rgba(255, 255, 255, 0.9); border-color: rgba(47, 125, 101, 0.3); }
+.search-input:focus { 
+  border-color: #2f7d65; background: #fff; 
+  box-shadow: 0 8px 20px rgba(47, 125, 101, 0.12), 0 0 0 4px rgba(47, 125, 101, 0.08);
+  transform: translateY(-1px);
+}
 
 /* ─── Buttons ────────────────────────────────────────────────── */
 .btn-primary {
   background: #2f7d65; color: white; border: none;
   padding: 10px 20px; border-radius: 999px; font-size: 13px;
   font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;
-  transition: background 0.2s, transform 0.15s;
+  transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
 }
-.btn-primary:hover { background: #256554; transform: translateY(-1px); }
+.btn-primary:hover { background: #256554; transform: translateY(-1px); box-shadow: 0 4px 14px rgba(47, 125, 101, 0.25); }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 .btn-ghost {
-  background: #f3f3f3; color: #444; border: none;
+  background: rgba(47, 125, 101, 0.06); color: #2f7d65; border: none;
   padding: 10px 20px; border-radius: 999px; font-size: 13px;
-  font-weight: 600; cursor: pointer; transition: background 0.2s;
+  font-weight: 600; cursor: pointer; transition: all 0.2s;
 }
-.btn-ghost:hover { background: #e8e8e8; }
+.btn-ghost:hover { background: rgba(47, 125, 101, 0.12); color: #1a5c3a; }
 
-/* ─── Table ─────────────────────────────────────────────────── */
-.table-card {
-  background: #fff; border-radius: 20px;
-  border: 1.5px solid #e8f0ea; overflow: hidden;
-  animation: fadeInUp 0.4s ease 0.1s both;
+/* ─── Tile Grid ──────────────────────────────────────────────── */
+.tile-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 18px; animation: fadeInUp 0.4s ease 0.1s both;
 }
-.loading-state { text-align: center; padding: 40px; color: #999; font-size: 14px; }
-.data-table { width: 100%; border-collapse: collapse; }
-.data-table thead tr { background: #f5fbf7; }
-.data-table th {
-  padding: 13px 16px; text-align: left;
-  font-size: 11px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.5px; color: #5a8a6a; border-bottom: 1.5px solid #e0f0e8;
-}
-.data-row { border-bottom: 1px solid #f0f5f1; transition: background 0.15s; }
-.data-row:hover { background: #f9fdfb; }
-.data-table td { padding: 13px 16px; font-size: 13px; color: #2a3a2a; }
-.empty-row { text-align: center; color: #aaa; padding: 40px; }
-.bold { font-weight: 600; }
-.mono { font-family: monospace; font-size: 12px; color: #555; }
 
-.badge-id {
-  background: #edf7f2; color: #2f7d65; border-radius: 8px;
+.record-tile {
+  background: white; border-radius: 18px; padding: 0;
+  border: 1.5px solid rgba(47, 125, 101, 0.1);
+  box-shadow: 0 2px 10px rgba(47, 125, 101, 0.04);
+  display: flex; flex-direction: column;
+  transition: transform 0.25s cubic-bezier(0.4,0,0.2,1), box-shadow 0.25s ease;
+  overflow: hidden; animation: fadeInUp 0.3s ease both;
+}
+.record-tile:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 30px rgba(47, 125, 101, 0.1);
+}
+
+.tile-header {
+  display: flex; align-items: center; gap: 14px;
+  padding: 18px 20px 14px;
+  background: linear-gradient(135deg, #f5fbf7, #edf7f2);
+  border-bottom: 1px solid rgba(47, 125, 101, 0.06);
+}
+.tile-icon {
+  width: 40px; height: 40px; border-radius: 12px;
+  background: rgba(47, 125, 101, 0.1); color: #2f7d65;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; flex-shrink: 0;
+}
+.tile-name {
+  font-size: 15px; font-weight: 700; color: #1a2e1a;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.tile-details { padding: 14px 20px; display: flex; flex-direction: column; gap: 8px; }
+.tile-row {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13px; color: #475569;
+}
+.tile-row i { color: #94a3b8; font-size: 12px; width: 14px; text-align: center; }
+.tile-pan { font-family: monospace; font-weight: 600; color: #2a3a2a; }
+
+.tile-footer {
+  padding: 12px 20px; border-top: 1px solid #f0f5f1;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.tile-meta { display: flex; justify-content: space-between; align-items: center; }
+.tile-badge {
+  background: rgba(47, 125, 101, 0.08); color: #2f7d65; border-radius: 8px;
   padding: 3px 9px; font-size: 11px; font-weight: 700; font-family: monospace;
+  border: 1px solid rgba(47, 125, 101, 0.1);
 }
-.user-chip {
-  background: #f0f0f0; color: #555; border-radius: 6px;
-  padding: 3px 8px; font-size: 11px; font-family: monospace;
+.tile-date { font-size: 11px; color: #94a3b8; font-weight: 500; }
+.tile-creator {
+  font-size: 12px; color: #64748b; display: flex; align-items: center; gap: 6px;
 }
+
+.tile-actions {
+  display: flex; gap: 6px; padding: 12px 20px; border-top: 1px solid #f0f5f1;
+}
+
+.loading-state {
+  display: flex; align-items: center; justify-content: center;
+  padding: 60px 20px; color: #2f7d65; gap: 12px; font-size: 15px;
+}
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 80px 20px; color: #94a3b8; gap: 16px;
+}
+.empty-state i { font-size: 40px; opacity: 0.4; }
 
 /* ─── Action buttons ─────────────────────────────────────────── */
-.action-btns { display: flex; gap: 6px; }
 .icon-action {
   width: 30px; height: 30px; border-radius: 8px; border: none;
   cursor: pointer; font-size: 12px; display: flex; align-items: center;
-  justify-content: center; transition: background 0.2s, transform 0.15s;
+  justify-content: center; transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
 }
-.icon-action:hover { transform: scale(1.1); }
-.icon-action.view { background: #f1f5f9; color: #3d5a80; }
-.icon-action.view:hover { background: #3d5a80; color: white; }
-.icon-action.edit { background: #edf7f2; color: #2f7d65; }
-.icon-action.edit:hover { background: #2f7d65; color: white; }
+.icon-action:hover { transform: scale(1.12); }
+.icon-action.view { background: rgba(61, 90, 128, 0.08); color: #3d5a80; }
+.icon-action.view:hover { background: #3d5a80; color: white; box-shadow: 0 4px 10px rgba(61, 90, 128, 0.2); }
+.icon-action.edit { background: rgba(47, 125, 101, 0.08); color: #2f7d65; }
+.icon-action.edit:hover { background: #2f7d65; color: white; box-shadow: 0 4px 10px rgba(47, 125, 101, 0.2); }
 .icon-action.assign { background: #fef3e2; color: #d97706; }
-.icon-action.assign:hover { background: #d97706; color: white; }
+.icon-action.assign:hover { background: #d97706; color: white; box-shadow: 0 4px 10px rgba(217, 119, 6, 0.2); }
 .icon-action.delete { background: #fee2e2; color: #dc2626; }
-.icon-action.delete:hover { background: #dc2626; color: white; }
+.icon-action.delete:hover { background: #dc2626; color: white; box-shadow: 0 4px 10px rgba(220, 38, 38, 0.2); }
 
 /* ─── Pagination ─────────────────────────────────────────────── */
 .pagination { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 14px; }
@@ -549,7 +704,8 @@ onMounted(fetchRecords)
 
 /* ─── Modal ──────────────────────────────────────────────────── */
 .modal-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.35);
+  position: fixed; inset: 0; background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
   display: flex; align-items: center; justify-content: center;
   z-index: 100; animation: fadeIn 0.2s ease;
 }
@@ -558,7 +714,7 @@ onMounted(fetchRecords)
 .modal {
   background: white; border-radius: 22px; width: 680px; max-width: 95vw;
   max-height: 90vh; display: flex; flex-direction: column;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.18), 0 0 0 1px rgba(47,125,101,0.08);
   animation: slideUp 0.25s ease;
 }
 .modal-sm { width: 420px; }
@@ -566,6 +722,10 @@ onMounted(fetchRecords)
   from { opacity: 0; transform: translateY(20px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+.confirm-modal { width: 420px; }
+.confirm-modal .modal-body { padding: 30px 26px; text-align: center; color: #475569; font-size: 14px; }
+.confirm-btn { background: #dc2626; }
+.confirm-btn:hover { background: #b91c1c; }
 .modal-header {
   display: flex; justify-content: space-between; align-items: center;
   padding: 22px 26px 18px; border-bottom: 1px solid #eee;

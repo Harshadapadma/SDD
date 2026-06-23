@@ -199,7 +199,7 @@ const doughnutOptions = {
   responsive: true,
   maintainAspectRatio: false,
   plugins: {
-    legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 6, padding: 20 } }
+    legend: { position: 'bottom' as const, labels: { usePointStyle: true, boxWidth: 6, padding: 20 } }
   },
   cutout: '70%'
 }
@@ -214,6 +214,10 @@ onMounted(fetchStats)
 }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 
 /* ─── Header ─────────────────────────────────────────────────── */
 .page-header { display: flex; justify-content: space-between; align-items: center; }
@@ -221,24 +225,37 @@ onMounted(fetchStats)
 .page-sub { font-size: 14px; color: #64748b; margin-top: 4px; }
 
 .date-chip {
-  background: white; border: 1.5px solid #e2e8f0; border-radius: 999px;
-  padding: 8px 16px; font-size: 13px; font-weight: 600; color: #475569;
+  background: linear-gradient(135deg, #f0faf5, #e6f5ee);
+  border: 1.5px solid rgba(47, 125, 101, 0.15); border-radius: 999px;
+  padding: 8px 16px; font-size: 13px; font-weight: 600; color: #2f7d65;
   display: flex; align-items: center; gap: 8px;
 }
 
 /* ─── Stats Grid ────────────────────────────────────────────── */
 .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
 .stat-card {
-  background: white; border-radius: 20px; padding: 24px;
-  border: 1px solid #e5e7eb; display: flex; align-items: center; gap: 20px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.02); transition: transform 0.2s;
+  background: linear-gradient(135deg, #f5fbf7 0%, #ecf5ef 100%);
+  border-radius: 20px; padding: 24px;
+  border: 1px solid rgba(47, 125, 101, 0.12); display: flex; align-items: center; gap: 20px;
+  box-shadow: 0 4px 20px rgba(47, 125, 101, 0.04);
+  transition: transform 0.3s cubic-bezier(0.4,0,0.2,1), box-shadow 0.3s ease;
+  position: relative; overflow: hidden;
 }
-.stat-card:hover { transform: translateY(-3px); }
+.stat-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.8), transparent);
+}
+.stat-card:nth-child(1) { animation: fadeInUp 0.4s ease 0.05s both; }
+.stat-card:nth-child(2) { animation: fadeInUp 0.4s ease 0.12s both; }
+.stat-card:nth-child(3) { animation: fadeInUp 0.4s ease 0.19s both; }
+.stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 28px rgba(47, 125, 101, 0.1); }
 
 .stat-icon-wrap {
   width: 54px; height: 54px; border-radius: 16px;
   display: flex; align-items: center; justify-content: center; font-size: 22px;
+  transition: transform 0.2s ease;
 }
+.stat-card:hover .stat-icon-wrap { transform: scale(1.1); }
 .stat-icon-wrap.green  { background: #dcfce7; color: #15803d; }
 .stat-icon-wrap.blue   { background: #e0f2fe; color: #0369a1; }
 .stat-icon-wrap.orange { background: #fef3c7; color: #b45309; }
@@ -251,10 +268,13 @@ onMounted(fetchStats)
   display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px;
 }
 .chart-card {
-  background: white; border-radius: 24px; border: 1px solid #e5e7eb;
+  background: white; border-radius: 24px; border: 1px solid rgba(47, 125, 101, 0.1);
   padding: 24px; display: flex; flex-direction: column; gap: 20px;
-  box-shadow: 0 4px 25px rgba(0,0,0,0.03);
+  box-shadow: 0 4px 25px rgba(47, 125, 101, 0.04);
+  transition: transform 0.3s cubic-bezier(0.4,0,0.2,1), box-shadow 0.3s ease;
+  animation: fadeInUp 0.4s ease 0.25s both;
 }
+.chart-card:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(47, 125, 101, 0.08); }
 .chart-card.large { grid-column: span 2; }
 
 .chart-header h3 { font-size: 16px; font-weight: 700; color: #1e293b; margin: 0; }
@@ -268,7 +288,7 @@ onMounted(fetchStats)
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   padding: 100px 0; color: #64748b; gap: 16px;
 }
-.loading-full i { font-size: 40px; color: #3d5a80; }
+.loading-full i { font-size: 40px; color: #2f7d65; }
 
 @media (max-width: 1100px) {
   .charts-grid { grid-template-columns: 1fr; }

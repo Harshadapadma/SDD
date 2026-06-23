@@ -13,13 +13,36 @@ const showPassword = ref(false);
 const router = useRouter();
 const { notify } = useNotifications();
 
+// ── Forgot Password ──────────────────────────────────────────
+const forgotLoading = ref(false);
+const forgotFlash = ref<{ type: 'success' | 'error'; msg: string } | null>(null);
+
+const handleForgotPassword = async () => {
+  forgotFlash.value = null;
+  if (!email.value || !email.value.includes("@")) {
+    forgotFlash.value = { type: 'error', msg: 'Enter your email address above first.' };
+    return;
+  }
+  forgotLoading.value = true;
+  try {
+    await api.post("auth/forgot-password/", { email: email.value });
+    forgotFlash.value = { type: 'success', msg: 'Reset link sent! Check your inbox.' };
+  } catch (err: any) {
+    const msg = err?.response?.data?.error || "Something went wrong. Please try again.";
+    forgotFlash.value = { type: 'error', msg };
+  } finally {
+    forgotLoading.value = false;
+  }
+};
+// ─────────────────────────────────────────────────────────────
+
 const handleLogin = async () => {
+  forgotFlash.value = null;
   if (!email.value || !password.value) {
     errorMessage.value = "Please enter both email and password.";
     return;
   }
 
-  // ✅ EMAIL VALIDATION
   if (!email.value.includes("@")) {
     errorMessage.value = "Email must include '@'";
     return;
@@ -28,7 +51,6 @@ const handleLogin = async () => {
   loading.value = true;
   errorMessage.value = "";
 
-  // Clear old tokens
   localStorage.removeItem("access");
   localStorage.removeItem("refresh");
   localStorage.removeItem("user");
@@ -46,7 +68,6 @@ const handleLogin = async () => {
     notify("Login Successful", "Welcome back to Negen SDD!", "SUCCESS");
     router.push("/");
   } catch (err: any) {
-
     errorMessage.value =
       err?.response?.data?.non_field_errors?.[0] ||
       err?.response?.data?.detail ||
@@ -79,10 +100,19 @@ const handleLogin = async () => {
         </div>
 
         <form @submit.prevent="handleLogin" class="login-form">
+          <!-- Login error banner -->
           <div v-if="errorMessage" class="error-banner">
             <i class="fa-solid fa-circle-exclamation"></i>
             <span>{{ errorMessage }}</span>
           </div>
+
+          <!-- Forgot-password flash banner -->
+          <Transition name="flash">
+            <div v-if="forgotFlash" :class="['forgot-flash', forgotFlash.type]">
+              <i :class="forgotFlash.type === 'success' ? 'fa-solid fa-circle-check' : 'fa-solid fa-circle-exclamation'"></i>
+              <span>{{ forgotFlash.msg }}</span>
+            </div>
+          </Transition>
 
           <div class="input-group">
             <label>Email Address</label>
@@ -103,6 +133,15 @@ const handleLogin = async () => {
           <div class="input-group">
             <div class="label-row">
               <label>Password</label>
+              <button
+                type="button"
+                class="forgot-link"
+                :disabled="forgotLoading"
+                @click="handleForgotPassword"
+              >
+                <span v-if="!forgotLoading">Forgot Password?</span>
+                <span v-else><i class="fa-solid fa-spinner fa-spin"></i> Sending…</span>
+              </button>
             </div>
             <div class="input-wrapper">
               <i class="fa-solid fa-lock"></i>
@@ -326,6 +365,29 @@ const handleLogin = async () => {
   gap: 20px;
 }
 
+/* Forgot-password inline flash */
+.forgot-flash {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 15px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  animation: shake 0.4s ease;
+}
+.forgot-flash.success {
+  background: rgba(220, 252, 231, 0.85);
+  color: #15803d;
+  border: 1px solid #86efac;
+  animation: fadeIn 0.3s ease;
+}
+.forgot-flash.error {
+  background: rgba(254, 242, 242, 0.85);
+  color: #991b1b;
+  border-left: 4px solid #ef4444;
+}
+
 .input-group {
   display: flex;
   flex-direction: column;
@@ -546,4 +608,176 @@ const handleLogin = async () => {
     padding: 40px 30px;
   }
 }
+
+/* ── Forgot-link as button ──────────────────────────────────── */
+.forgot-link {
+  font-size: 13px;
+  color: #CA5728;
+  font-weight: 500;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: "Inter", sans-serif;
+  transition: color 0.2s;
+}
+.forgot-link:hover { color: #A64821; text-decoration: underline; }
+
+/* ── Modal Overlay ──────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+}
+
+.modal-card {
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(20px);
+  border-radius: 24px;
+  padding: 40px 36px 32px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(202, 87, 40, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.modal-header {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.modal-icon {
+  width: 52px;
+  height: 52px;
+  background: linear-gradient(135deg, #CA5728, #A64821);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 22px;
+  margin-bottom: 4px;
+  box-shadow: 0 8px 20px rgba(202, 87, 40, 0.3);
+}
+
+.modal-header h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.modal-header p {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Flash message */
+.flash-msg {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.flash-msg.success {
+  background: rgba(220, 252, 231, 0.9);
+  color: #15803d;
+  border: 1px solid #86efac;
+}
+.flash-msg.error {
+  background: rgba(254, 242, 242, 0.9);
+  color: #991b1b;
+  border-left: 4px solid #ef4444;
+  animation: shake 0.4s ease;
+}
+
+.modal-input-group .input-wrapper {
+  width: 100%;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.modal-cancel {
+  flex: 1;
+  padding: 13px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(202, 87, 40, 0.2);
+  background: transparent;
+  color: #374151;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: "Inter", sans-serif;
+  transition: all 0.2s;
+}
+.modal-cancel:hover:not(:disabled) { background: #f9fafb; }
+.modal-cancel:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.modal-submit {
+  flex: 2;
+  padding: 13px;
+  border-radius: 12px;
+  border: none;
+  background: #CA5728;
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: "Inter", sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.3s;
+  box-shadow: 0 4px 12px rgba(202, 87, 40, 0.25);
+}
+.modal-submit:hover:not(:disabled) {
+  background: #A64821;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(202, 87, 40, 0.35);
+}
+.modal-submit:disabled { opacity: 0.6; cursor: not-allowed; filter: grayscale(0.3); }
+
+.loader.sm {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
+
+/* ── Transitions ────────────────────────────────────────────── */
+.modal-fade-enter-active { animation: modalIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.modal-fade-leave-active { animation: modalOut 0.2s ease; }
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.88) translateY(20px); }
+  to   { opacity: 1; transform: scale(1)   translateY(0); }
+}
+@keyframes modalOut {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.94) translateY(10px); }
+}
+
+.flash-enter-active { animation: flashIn 0.3s ease; }
+.flash-leave-active { animation: flashOut 0.2s ease; }
+@keyframes flashIn  { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes flashOut { from { opacity: 1; } to { opacity: 0; } }
 </style>

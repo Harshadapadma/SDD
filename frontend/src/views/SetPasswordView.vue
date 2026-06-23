@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import api from "../api/client";
 
@@ -19,6 +19,15 @@ const successMsg = ref("");
 // Visibility Toggles
 const showPassword = ref(false);
 const showConfirmPassword = ref(false);
+
+// Password strength rules
+const passRules = computed(() => [
+  { label: 'At least 8 characters', met: password.value.length >= 8 },
+  { label: 'One uppercase letter', met: /[A-Z]/.test(password.value) },
+  { label: 'One number', met: /[0-9]/.test(password.value) },
+  { label: 'One special character', met: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(password.value) },
+]);
+const allRulesMet = computed(() => passRules.value.every(r => r.met));
 
 onMounted(async () => {
   uid.value = (route.query.uid as string) || "";
@@ -51,8 +60,8 @@ const handleSetPassword = async () => {
     return;
   }
 
-  if (password.value.length < 8) {
-    errorMsg.value = "Password must be at least 8 characters.";
+  if (!allRulesMet.value) {
+    errorMsg.value = "Password does not meet all requirements.";
     return;
   }
 
@@ -69,7 +78,7 @@ const handleSetPassword = async () => {
       router.push("/login");
     }, 2000);
   } catch (err: any) {
-    errorMsg.error = err?.response?.data?.detail || "Failed to set password.";
+    errorMsg.value = err?.response?.data?.detail || "Failed to set password.";
   } finally {
     loading.value = false;
   }
@@ -113,13 +122,20 @@ const handleSetPassword = async () => {
           <input 
             v-model="password" 
             :type="showPassword ? 'text' : 'password'" 
-            placeholder="Min. 8 characters" 
+            placeholder="e.g. MyPass@123" 
             :disabled="!!successMsg || loading || !userData"
           />
           <button class="peek-btn" @click="showPassword = !showPassword" type="button" tabindex="-1">
             <i :class="['fas', showPassword ? 'fa-eye-slash' : 'fa-eye']"></i>
           </button>
         </div>
+        <!-- PASSWORD RULES -->
+        <ul class="pass-rules" v-if="password">
+          <li v-for="(rule, i) in passRules" :key="i" :class="{ met: rule.met }">
+            <i :class="['fas', rule.met ? 'fa-check-circle' : 'fa-times-circle']"></i>
+            {{ rule.label }}
+          </li>
+        </ul>
       </div>
 
       <!-- CONFIRM FIELD -->
@@ -216,4 +232,16 @@ h2 { font-size: 24px; color: #1e293b; margin: 0 0 8px 0; text-align: center; fon
 }
 .alert.error { background: #fff1f2; color: #e11d48; border: 1.5px solid #ffe4e6; }
 .alert.success { background: #f0fdf4; color: #16a34a; border: 1.5px solid #dcfce7; }
+
+/* ─── Password Rules Checklist ──────────────────────────────── */
+.pass-rules {
+  list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-direction: column; gap: 6px;
+}
+.pass-rules li {
+  font-size: 12px; font-weight: 600; color: #e11d48;
+  display: flex; align-items: center; gap: 8px;
+  transition: color 0.25s ease;
+}
+.pass-rules li.met { color: #16a34a; }
+.pass-rules li i { font-size: 13px; width: 16px; text-align: center; }
 </style>

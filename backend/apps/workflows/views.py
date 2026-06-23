@@ -88,28 +88,35 @@ class ReviewDeleteRequestView(APIView):
         # ✅ Handle actions
         if action == "APPROVE":
             delete_request.status = DeleteRequestStatus.APPROVED
-            delete_request.record.delete()
-
         elif action == "REJECT":
             delete_request.status = DeleteRequestStatus.REJECTED
-
         else:
             return Response({"error": "Invalid action"}, status=400)
 
         delete_request.reviewed_by = request.user
+
+        # Capture references before potential deletion wipes them
+        record_to_delete = delete_request.record if action == "APPROVE" else None
+        record_id_label = record_to_delete.public_id if record_to_delete else "the record"
+        requester = delete_request.requested_by
+
         delete_request.save()
 
         # 🔥 NOTIFY USER (who requested delete)
         Notification.objects.create(
-            user=delete_request.requested_by,
+            user=requester,
             title="Delete Request Update",
-            message=f"Your delete request has been {delete_request.status.lower()}",
+            message=f"Your delete request for {record_id_label} has been {delete_request.status.lower()}",
             type="INFO"
         )
+
+        if record_to_delete:
+            record_to_delete.delete()
 
         return Response({
             "message": f"Request {action.lower()}d successfully"
         })
+
 
 # -------------------------------
 # Request Role Change

@@ -19,6 +19,7 @@ import UserDashboard      from "../views/user/UserDashboard.vue";
 import UserRecords        from "../views/user/UserRecords.vue";
 import UserRequests       from "../views/user/UserRequests.vue";
 import UserProfile        from "../views/user/UserProfile.vue";
+import AdminProfile       from "../views/admin/AdminProfile.vue";
 import RecordDetailView   from "../views/RecordDetailView.vue";
 
 const getUser = () => {
@@ -75,7 +76,12 @@ const routes = [
       },
       {
         path: "profile",
-        component: UserProfile
+        component: {
+          render() {
+            const u = getUser();
+            return u?.role === "ADMIN" ? h(AdminProfile) : h(UserProfile);
+          }
+        }
       },
       {
         path: "records/:id",

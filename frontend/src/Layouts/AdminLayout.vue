@@ -43,7 +43,7 @@
 
       <!-- FOOTER -->
       <div class="sidebar-footer">
-        <div class="footer-avatar" @click="$router.push('/records')">{{ userName.charAt(0).toUpperCase() }}</div>
+        <div class="footer-avatar" @click="$router.push('/profile')" title="Go to Profile">{{ userName.charAt(0).toUpperCase() }}</div>
         <div class="footer-info" v-if="!isCollapsed">
           <span class="footer-name">{{ userName }}</span>
           <span class="footer-email">{{ userEmail }}</span>
@@ -70,66 +70,68 @@
             </button>
 
             <!-- ─── NOTIFICATION PANEL ─────────────────────── -->
-            <transition name="panel">
-              <div class="notif-panel" v-if="panelOpen">
+            <transition name="a-panel">
+              <div class="a-notif-panel" v-if="panelOpen">
 
                 <!-- Panel Header -->
-                <div class="panel-header">
-                  <span class="panel-title">Notifications</span>
-                  <div class="panel-actions">
+                <div class="a-panel-header">
+                  <span class="a-panel-title admin-title">Notifications</span>
+                  <div class="a-panel-actions">
                     <!-- Mute toggle -->
                     <button
-                      class="panel-icon-btn"
+                      class="a-panel-icon-btn"
                       :title="isMuted ? 'Unmute popups' : 'Mute popups'"
                       @click="toggleMute"
                     >
                       <i :class="['fas', isMuted ? 'fa-bell-slash' : 'fa-bell']" :style="{ color: isMuted ? '#ef4444' : undefined }"></i>
                     </button>
                     <!-- Mark all read -->
-                    <button class="panel-icon-btn" title="Mark all read" @click="markAllRead" :disabled="unreadCount === 0">
+                    <button class="a-panel-icon-btn" title="Mark all read" @click="markAllRead" :disabled="unreadCount === 0">
                       <i class="fas fa-check-double"></i>
                     </button>
                     <!-- View all -->
-                    <button class="panel-icon-btn" title="View all" @click="$router.push('/notifications'); panelOpen = false">
+                    <button class="a-panel-icon-btn" title="View all" @click="$router.push('/notifications'); panelOpen = false">
                       <i class="fas fa-arrow-up-right-from-square"></i>
                     </button>
                   </div>
                 </div>
 
                 <!-- Muted banner -->
-                <div class="muted-banner" v-if="isMuted">
+                <div class="a-muted-banner" v-if="isMuted">
                   <i class="fas fa-bell-slash"></i> Popups are muted
                 </div>
 
                 <!-- Panel Items -->
-                <div class="panel-body">
-                  <div v-if="notifications.length === 0" class="panel-empty">
+                <div class="a-panel-body">
+                  <div v-if="notifications.filter(n => !n.is_read).length === 0" class="a-panel-empty">
                     <i class="fas fa-bell-slash"></i>
-                    <p>No notifications yet</p>
+                    <p>No unread notifications</p>
                   </div>
 
                   <div
-                    v-for="n in notifications.slice(0, 20)"
+                    v-for="n in notifications.filter(n => !n.is_read).slice(0, 20)"
                     :key="n.id"
-                    :class="['panel-item', n.type.toLowerCase(), { unread: !n.is_read }]"
+                    :class="['a-panel-item', n.type.toLowerCase(), { unread: !n.is_read }]"
                     @click="markRead(n.id)"
                   >
-                    <div class="panel-item-icon">
+                    <div class="a-panel-item-icon">
                       <i :class="['fas', typeIcon(n.type)]"></i>
                     </div>
-                    <div class="panel-item-body">
-                      <div class="panel-item-title">{{ n.title }}</div>
-                      <div class="panel-item-msg">{{ n.message }}</div>
-                      <div class="panel-item-time">{{ formatTime(n.created_at) }}</div>
+                    <div class="a-panel-item-body">
+                      <div class="a-panel-item-header">
+                        <div class="a-panel-item-title">{{ n.title }}</div>
+                        <div class="a-panel-item-time">{{ formatTime(n.created_at) }}</div>
+                      </div>
+                      <div class="a-panel-item-msg">{{ n.message }}</div>
                     </div>
-                    <div class="panel-unread-dot" v-if="!n.is_read"></div>
+                    <div class="a-panel-unread-dot" v-if="!n.is_read"></div>
                   </div>
                 </div>
               </div>
             </transition>
           </div>
 
-          <div class="profile-pill">A</div>
+          <div class="profile-pill" @click="$router.push('/profile')" style="cursor: pointer;" title="Go to Profile">{{ userName.charAt(0).toUpperCase() }}</div>
         </div>
       </div>
 
@@ -142,20 +144,20 @@
 
     <!-- ─── TOAST POPUPS (top-right, below bell) ────────────── -->
     <teleport to="body">
-      <div class="toast-stack">
+      <div class="a-toast-stack">
         <div
           v-for="t in toasts"
           :key="t._tid"
-          :class="['toast', t.type.toLowerCase(), { leaving: t.leaving }]"
+          :class="['a-toast', t.type.toLowerCase(), { leaving: t.leaving }]"
         >
-          <div class="toast-icon">
+          <div class="a-toast-icon">
             <i :class="['fas', typeIcon(t.type)]"></i>
           </div>
-          <div class="toast-body">
-            <div class="toast-title">{{ t.title }}</div>
-            <div class="toast-msg">{{ t.message }}</div>
+          <div class="a-toast-body">
+            <div class="a-toast-title">{{ t.title }}</div>
+            <div class="a-toast-msg">{{ t.message }}</div>
           </div>
-          <button class="toast-close" @click="dismissToast(t._tid)">
+          <button class="a-toast-close" @click="dismissToast(t._tid)">
             <i class="fas fa-times"></i>
           </button>
         </div>
@@ -540,6 +542,7 @@ onUnmounted(stopPolling)
   flex-direction: column;
   min-width: 0;
   animation: fadeIn 0.4s ease 0.1s both;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.03);
 }
 
 /* ─── Topbar ────────────────────────────────────────────────── */
@@ -562,7 +565,7 @@ onUnmounted(stopPolling)
 /* ─── Notification Button ───────────────────────────────────── */
 .icon-btn {
   position: relative;
-  background: #f0f0f0;
+  background: #f1f5f9;
   border: none;
   width: 38px;
   height: 38px;
@@ -571,7 +574,7 @@ onUnmounted(stopPolling)
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #444;
+  color: #475569;
   font-size: 15px;
   transition: background 0.2s, color 0.2s, transform 0.2s;
 }
@@ -590,7 +593,7 @@ onUnmounted(stopPolling)
   position: absolute;
   top: 1px;
   right: 1px;
-  background: #e74c3c;
+  background: #ee6c4d; /* Warm orange — matches user panel */
   color: white;
   font-size: 9px;
   font-weight: 700;
@@ -641,69 +644,74 @@ onUnmounted(stopPolling)
   color: white;
 }
 
-.notif-panel {
+.a-notif-panel {
+  --a-accent: 47, 125, 101;
   position: absolute;
   top: calc(100% + 12px);
   right: 0;
   width: 360px;
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.12), 0 2px 10px rgba(0,0,0,0.06);
-  border: 1px solid #eee;
+  border-radius: 20px;
+  background: linear-gradient(rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.92)), rgba(var(--a-accent), 0.4);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(var(--a-accent), 0.2);
+  box-shadow: 
+    0 8px 32px rgba(var(--a-accent), 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 0 12px 6px rgba(var(--a-accent), 0.15);
   z-index: 50;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   transform-origin: top right;
+  color: #1e293b;
 }
 
-.panel-enter-active, .panel-leave-active {
+.a-panel-enter-active, .a-panel-leave-active {
   transition: opacity 0.2s, transform 0.2s;
 }
-.panel-enter-from, .panel-leave-to {
+.a-panel-enter-from, .a-panel-leave-to {
   opacity: 0;
   transform: scale(0.96) translateY(-4px);
 }
 
-.panel-header {
+.a-panel-header {
   padding: 14px 18px;
-  border-bottom: 1px solid #eee;
+  background: rgba(var(--a-accent), 0.08);
+  border-bottom: 1px solid rgba(var(--a-accent), 0.15);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #fafafa;
 }
 
-.panel-title {
-  font-weight: 700;
-  font-size: 14px;
-}
+.a-panel-title { font-weight: 700; font-size: 14px; color: #1e293b; }
+.admin-title { color: #2f7d65; }
 
-.panel-actions {
+.a-panel-actions {
   display: flex;
   gap: 4px;
 }
 
-.panel-icon-btn {
+.a-panel-icon-btn {
   background: none;
   border: none;
   padding: 6px;
   border-radius: 8px;
   cursor: pointer;
-  color: #666;
+  color: #2f7d65;
   transition: all 0.2s;
 }
-.panel-icon-btn:hover {
-  background: #eee;
-  color: #333;
+.a-panel-icon-btn:hover {
+  background: rgba(47,125,101,0.12);
 }
-.panel-icon-btn:disabled {
+.a-panel-icon-btn:disabled {
   opacity: 0.3;
   cursor: not-allowed;
 }
 
-.muted-banner {
-  background: #fef2f2;
+.a-muted-banner {
+  background: rgba(254, 226, 226, 0.8);
   color: #ef4444;
   padding: 8px 16px;
   font-size: 12px;
@@ -711,40 +719,78 @@ onUnmounted(stopPolling)
   display: flex;
   align-items: center;
   gap: 8px;
-  border-bottom: 1px solid #fee2e2;
+  border-bottom: 1px solid rgba(239, 68, 68, 0.2);
 }
 
-.panel-body {
+.a-panel-body {
   max-height: 400px;
   overflow-y: auto;
 }
-
-.panel-empty {
+.a-panel-empty {
   padding: 40px;
   text-align: center;
-  color: #bbb;
+  color: #64748b;
 }
-.panel-empty i {
+.a-panel-empty i {
   font-size: 32px;
   margin-bottom: 10px;
 }
 
-.panel-item {
+.a-panel-item {
   display: flex;
-  padding: 14px 18px;
-  gap: 12px;
-  border-bottom: 1px solid #f5f5f5;
+  margin: 6px 10px;
+  padding: 10px 14px;
+  gap: 10px;
+  align-items: center;
   cursor: pointer;
-  transition: background 0.2s;
-}
-.panel-item:hover {
-  background: #f9fdfb;
-}
-.panel-item.unread {
-  background: #f4faf6;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-radius: 20px;
+  border: 1px solid rgba(var(--a-accent), 0.15);
+  box-shadow: 
+    0 4px 16px rgba(var(--a-accent), 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.1);
 }
 
-.panel-item-icon {
+.a-panel-item::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
+}
+
+.a-panel-item::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; width: 1px; height: 100%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.8), transparent, rgba(255, 255, 255, 0.3));
+}
+
+.a-panel-item:hover {
+  background: rgba(255, 255, 255, 0.85);
+  transform: translateY(-1px);
+  box-shadow: 
+    0 8px 24px rgba(var(--a-accent), 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.a-panel-item.unread {
+  background: rgba(255, 255, 255, 0.90);
+}
+
+.a-panel-item.info { background: rgba(59, 130, 246, 0.10); }
+.a-panel-item.success { background: rgba(34, 197, 94, 0.10); }
+.a-panel-item.warning { background: rgba(245, 158, 11, 0.10); }
+.a-panel-item.error { background: rgba(239, 68, 68, 0.10); }
+
+.a-panel-item-icon {
   width: 32px;
   height: 32px;
   border-radius: 10px;
@@ -752,44 +798,56 @@ onUnmounted(stopPolling)
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  font-size: 13px;
+  font-size: 14px;
 }
-.panel-item.info .panel-item-icon { background: #dbeafe; color: #1d4ed8; }
-.panel-item.success .panel-item-icon { background: #dcfce7; color: #15803d; }
-.panel-item.warning .panel-item-icon { background: #fef3cd; color: #b45309; }
-.panel-item.error .panel-item-icon { background: #fee2e2; color: #b91c1c; }
+.a-panel-item.info .a-panel-item-icon { background: #e0f2fe; color: #0284c7; }
+.a-panel-item.success .a-panel-item-icon { background: #dcfce7; color: #15803d; }
+.a-panel-item.warning .a-panel-item-icon { background: #fef3cd; color: #b45309; }
+.a-panel-item.error .a-panel-item-icon { background: #fee2e2; color: #b91c1c; }
 
-.panel-item-body {
+.a-panel-item-body {
   flex: 1;
+  min-width: 0;
 }
-.panel-item-title {
-  font-size: 12px;
-  font-weight: 700;
-  color: #111;
+.a-panel-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
   margin-bottom: 2px;
 }
-.panel-item-msg {
+.a-panel-item-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.a-panel-item-msg {
   font-size: 12px;
-  color: #555;
+  color: #475569;
   line-height: 1.4;
   margin-bottom: 4px;
 }
-.panel-item-time {
+.a-panel-item-time {
   font-size: 10px;
-  color: #999;
+  color: #64748b;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0.8;
 }
 
-.panel-unread-dot {
+.a-panel-unread-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #2f7d65;
-  margin-top: 4px;
+  background: rgba(var(--a-accent), 1);
+  box-shadow: 0 0 6px rgba(var(--a-accent), 0.6);
   flex-shrink: 0;
 }
 
 /* ─── Toasts ────────────────────────────────────────────────── */
-.toast-stack {
+.a-toast-stack {
   position: fixed;
   top: 70px;
   right: 24px;
@@ -800,83 +858,107 @@ onUnmounted(stopPolling)
   pointer-events: none;
 }
 
-.toast {
+.a-toast {
   pointer-events: auto;
-  width: 320px;
-  background: white;
-  border-radius: 14px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
-  padding: 14px 16px;
+  width: 340px;
+  border-radius: 20px;
+  padding: 12px 16px;
   display: flex;
   gap: 12px;
-  align-items: flex-start;
-  border-left: 4px solid #2f7d65;
+  align-items: center;
   position: relative;
-  
-  /* Entrance animation */
-  animation: toastIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+  overflow: hidden;
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  transition: all 0.2s ease;
+  animation: atoastIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
 }
 
-.toast.leaving {
-  /* Exit animation playing when leaving is set to true */
-  animation: toastOut 0.5s ease-in forwards;
+.a-toast::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
 }
 
-.toast.info    { border-left-color: #3b82f6; }
-.toast.success { border-left-color: #22c55e; }
-.toast.warning { border-left-color: #f59e0b; }
-.toast.error   { border-left-color: #ef4444; }
+.a-toast::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; width: 1px; height: 100%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.8), transparent, rgba(255, 255, 255, 0.3));
+}
 
-.toast-icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
+.a-toast.leaving {
+  animation: atoastOut 0.5s ease-in forwards;
+}
+
+.a-toast.info { --a-t-accent: 234, 179, 8; }
+.a-toast.success { --a-t-accent: 34, 197, 94; }
+.a-toast.warning { --a-t-accent: 245, 158, 11; }
+.a-toast.error { --a-t-accent: 239, 68, 68; }
+
+.a-toast {
+  background: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(var(--a-t-accent), 0.25);
+  box-shadow: 
+    0 12px 40px rgba(var(--a-t-accent), 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 0 14px 7px rgba(var(--a-t-accent), 0.15);
+}
+
+.a-toast-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: 14px;
 }
-.toast.info .toast-icon    { background: #dbeafe; color: #1d4ed8; }
-.toast.success .toast-icon { background: #dcfce7; color: #15803d; }
-.toast.warning .toast-icon { background: #fef3cd; color: #b45309; }
-.toast.error .toast-icon   { background: #fee2e2; color: #b91c1c; }
+.a-toast.info .a-toast-icon { background: #fef9c3; color: #a16207; }
+.a-toast.success .a-toast-icon { background: #dcfce7; color: #15803d; }
+.a-toast.warning .a-toast-icon { background: #fef3cd; color: #b45309; }
+.a-toast.error .a-toast-icon { background: #fee2e2; color: #b91c1c; }
 
-.toast-body {
+.a-toast-body {
   flex: 1;
 }
-.toast-title {
-  font-size: 13px;
+.a-toast-title {
+  font-size: 12.5px;
   font-weight: 700;
   margin-bottom: 2px;
+  color: #1e293b;
 }
-.toast-msg {
+.a-toast-msg {
   font-size: 12px;
-  color: #555;
+  color: #475569;
   line-height: 1.4;
 }
 
-.toast-close {
+.a-toast-close {
   background: none;
   border: none;
   cursor: pointer;
-  color: #aaa;
+  color: #64748b;
   font-size: 14px;
-  padding: 2px;
-  transition: color 0.2s;
+  padding: 4px;
+  border-radius: 6px;
+  transition: background 0.2s, color 0.2s;
 }
-.toast-close:hover {
-  color: #444;
+.a-toast-close:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #1e293b;
 }
 
-@keyframes toastIn {
+@keyframes atoastIn {
   0% { transform: translateX(100%); opacity: 0; }
   100% { transform: translateX(0); opacity: 1; }
 }
 
-@keyframes toastOut {
+@keyframes atoastOut {
   0% { transform: scale(1) translateY(0); opacity: 1; }
   100% { transform: scale(0.5) translate(30px, -60px); opacity: 0; } /* flies slightly up toward bell */
 }
-
 </style>
