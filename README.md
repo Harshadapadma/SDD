@@ -52,7 +52,18 @@ Follow these instructions to set up and run the project on your local machine.
    pip install -r requirements.txt
    ```
 
-5. **Run the development server**:
+5. **Run database migrations**:
+   ```bash
+   python manage.py migrate
+   ```
+
+6. **Setup the admin account**:
+   Create the initial admin user using the credentials specified in your `.env` file:
+   ```bash
+   python manage.py setup_admin
+   ```
+
+7. **Run the development server**:
    ```bash
    python manage.py runserver
    ```
