@@ -1,17 +1,25 @@
 """
-Beautiful HTML email templates for Negen SDD.
-- All styles are inlined for maximum email-client compatibility.
-- Logo is resized to a small thumbnail via Pillow to keep emails
-  well under Gmail's 102 KB clip threshold.
-- Logo is embedded as a base64 data URI (no external URL needed).
+Beautiful, high-density HTML email templates for Negen SDD.
+- Designed in accordance with Negen SDD Design Tokens & Visual Language:
+  * Warm Earthy Sand background (#F9F8F5)
+  * Signature Negen Orange Gradients (#fb923c -> #ea6c00 -> #c2570a)
+  * Slate / Obsidian Dark Security accents (#1e2937 -> #0f172a)
+  * Tactile dataset cards & monospace identifier badges
+  * High-contrast CTA buttons
+- Streamlined to present strictly essential information & datasets with zero text fluff.
+- Supports both inline MIME CID attachments (cid:negen_logo) for real email clients (Gmail, Outlook)
+  and base64 data URIs for web preview files.
 """
 
 import base64
 import io
 import os
+from email.mime.image import MIMEImage
 
-# ── Logo embedding ─────────────────────────────────────────────────────────────
-# __file__ = <project_root>/backend/apps/users/email_templates.py
+from django.conf import settings
+from django.core.mail import EmailMultiAlternatives
+
+# ── Logo embedding & path detection ──────────────────────────────────────────
 _THIS_FILE    = os.path.abspath(__file__)
 _USERS_DIR    = os.path.dirname(_THIS_FILE)       # backend/apps/users
 _APPS_DIR     = os.path.dirname(_USERS_DIR)       # backend/apps
@@ -24,23 +32,23 @@ _LOGO_CANDIDATES = [
     os.path.join(_BACKEND_DIR,  "assets", "logo.png"),
 ]
 
-def _load_logo_b64(max_px: int = 90) -> str:
-    """
-    Find the logo, resize it to max_px × max_px using Pillow (to keep
-    the base64 payload tiny), and return a data URI string.
-    Falls back to an empty string if the file is not found or Pillow fails.
-    """
-    logo_path = None
+def get_logo_file_path() -> str | None:
+    """Return absolute file path of logo.png if it exists."""
     for p in _LOGO_CANDIDATES:
         if os.path.isfile(p):
-            logo_path = p
-            break
+            return p
+    return None
 
+def _load_logo_b64(max_px: int = 90) -> str:
+    """
+    Find the logo, resize it to max_px × max_px using Pillow,
+    and return a data URI string for static web previews.
+    """
+    logo_path = get_logo_file_path()
     if not logo_path:
         print(f"[email_templates] WARNING: logo not found. Tried: {_LOGO_CANDIDATES}")
         return ""
 
-    # Try Pillow resize first (keeps size tiny)
     try:
         from PIL import Image
         with Image.open(logo_path) as img:
@@ -49,16 +57,13 @@ def _load_logo_b64(max_px: int = 90) -> str:
             buf = io.BytesIO()
             img.save(buf, format="PNG", optimize=True)
             b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
-            print(f"[email_templates] Logo loaded & resized ({max_px}px): {logo_path}")
             return f"data:image/png;base64,{b64}"
     except Exception as e:
-        print(f"[email_templates] Pillow resize failed ({e}), falling back to raw file")
+        print(f"[email_templates] Pillow resize failed ({e}), checking raw file")
 
-    # Fallback: encode raw file (large, but better than nothing)
     try:
         with open(logo_path, "rb") as f:
             b64 = base64.b64encode(f.read()).decode("utf-8")
-        print(f"[email_templates] Logo loaded (raw): {logo_path}")
         return f"data:image/png;base64,{b64}"
     except Exception as e:
         print(f"[email_templates] Could not read logo: {e}")
@@ -66,180 +71,246 @@ def _load_logo_b64(max_px: int = 90) -> str:
 
 
 LOGO_DATA_URI = _load_logo_b64(max_px=90)
-# ──────────────────────────────────────────────────────────────────────────────
 
 
-def _logo_img(size: int = 72, radius: int = 16) -> str:
-    """Return an <img> tag for the logo, or empty string if not available."""
-    if not LOGO_DATA_URI:
-        return ""
+def _logo_img(size: int = 48, radius: int = 12) -> str:
+    """
+    Return an <img> tag for the logo.
+    By default uses LOGO_DATA_URI (which send_sdd_email dynamically transforms to cid:negen_logo for email sending).
+    Includes styled alt text and fallback formatting.
+    """
+    src_val = LOGO_DATA_URI if LOGO_DATA_URI else "cid:negen_logo"
     return (
-        f'<img src="{LOGO_DATA_URI}" alt="Negen SDD" width="{size}" height="{size}" '
-        f'style="display:block;border-radius:{radius}px;background:#fff;'
-        f'padding:6px;object-fit:contain;" />'
+        f'<img src="{src_val}" alt="Negen SDD" width="{size}" height="{size}" '
+        f'style="display:block;border:none;outline:none;border-radius:{radius}px;background:#ffffff;'
+        f'padding:4px;box-shadow:0 2px 6px rgba(0,0,0,0.15);object-fit:contain;font-family:sans-serif;'
+        f'font-size:10px;font-weight:bold;color:#ea6c00;text-align:center;" />'
     )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# EMAIL 1 — Account Created
+# EMAIL SENDER WRAPPER — CID Inline Logo Attachment
+# ══════════════════════════════════════════════════════════════════════════════
+def send_sdd_email(
+    subject: str,
+    message: str,
+    recipient_list: list[str],
+    html_message: str,
+    from_email: str = None,
+    fail_silently: bool = False
+) -> bool:
+    """
+    Sends an HTML email with Negen SDD logo attached as an inline CID image (cid:negen_logo).
+    This guarantees that Gmail, Outlook, Apple Mail, etc. display the logo natively without blocking it.
+    """
+    if from_email is None:
+        from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'webmaster@localhost')
+
+    msg = EmailMultiAlternatives(
+        subject=subject,
+        body=message,
+        from_email=from_email,
+        to=recipient_list
+    )
+
+    # Convert data URI to cid:negen_logo for real email delivery
+    html_to_send = html_message
+    if LOGO_DATA_URI and LOGO_DATA_URI in html_to_send:
+        html_to_send = html_to_send.replace(LOGO_DATA_URI, "cid:negen_logo")
+
+    msg.attach_alternative(html_to_send, "text/html")
+
+    # Attach inline logo image with Content-ID <negen_logo>
+    logo_path = get_logo_file_path()
+    if logo_path and os.path.isfile(logo_path):
+        try:
+            with open(logo_path, "rb") as f:
+                logo_raw = f.read()
+
+            logo_bytes = logo_raw
+            try:
+                from PIL import Image
+                with Image.open(logo_path) as img:
+                    img = img.convert("RGBA")
+                    img.thumbnail((120, 120), Image.LANCZOS)
+                    buf = io.BytesIO()
+                    img.save(buf, format="PNG", optimize=True)
+                    logo_bytes = buf.getvalue()
+            except Exception as pe:
+                print(f"[send_sdd_email] Pillow thumbnail failed ({pe}), using raw bytes")
+
+            img_mime = MIMEImage(logo_bytes, _subtype="png")
+            img_mime.add_header("Content-ID", "<negen_logo>")
+            img_mime.add_header("Content-Disposition", "inline", filename="logo.png")
+            msg.attach(img_mime)
+            print(f"[send_sdd_email] Attached inline CID logo to email for {recipient_list}")
+        except Exception as e:
+            print(f"[send_sdd_email] Failed to attach inline logo: {e}")
+
+    return msg.send(fail_silently=fail_silently)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TEMPLATE 1 — User Registration & Account Created (Warm Negen Orange Theme)
 # ══════════════════════════════════════════════════════════════════════════════
 def get_account_created_email(
     name: str, email: str, role: str, public_id: str, setup_url: str
 ) -> tuple[str, str]:
-    """Returns (subject, html_body) for the Account Created email."""
+    """Returns (subject, html_body) for the Account Registration email."""
 
     role_colors = {
-        "COLLABORATOR": ("#CA5728", "#fff3ee", "#7c2d12"),
-        "VIEWER":       ("#3d5a80", "#e8f0f8", "#1e3a5f"),
-        "ADMIN":        ("#7c3aed", "#f3f0ff", "#4c1d95"),
+        "ADMIN":                ("#7c3aed", "#f3f0ff", "Administrator"),
+        "COLLABORATOR":         ("#ea6c00", "#fff7ed", "Collaborator"),
+        "VIEWER":               ("#2563eb", "#eff6ff", "Viewer"),
+        "COMPLIANCE_OFFICER":   ("#059669", "#ecfdf5", "Compliance Officer"),
     }
-    accent, light_bg, dark = role_colors.get(role, ("#CA5728", "#fff3ee", "#7c2d12"))
-    role_label = role.capitalize()
-    initial = name[0].upper() if name else "U"
+    badge_color, badge_bg, role_label = role_colors.get(
+        role.upper(), ("#ea6c00", "#fff7ed", role.capitalize())
+    )
+    initial = (name[0].upper() if name else "U")
 
-    subject = "Welcome to Negen SDD \u2013 Your Account is Ready"
+    subject = "Negen SDD – Account Activation & Credentials"
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Welcome to Negen SDD</title>
+<title>Account Activation</title>
 </head>
-<body style="margin:0;padding:0;background:#f1f5f9;font-family:'Segoe UI',Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f1f5f9;padding:32px 12px;">
+<body style="margin:0;padding:0;background-color:#F9F8F5;font-family:'Inter', -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;-webkit-font-smoothing:antialiased;">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F9F8F5;padding:40px 16px;">
 <tr><td align="center">
 <table width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;">
 
-  <!-- HEADER -->
+  <!-- BRAND HEADER -->
   <tr>
-    <td style="background:linear-gradient(135deg,#CA5728,#8b2e0e);border-radius:18px 18px 0 0;padding:32px;text-align:center;">
-      <table cellpadding="0" cellspacing="0" border="0" align="center">
+    <td style="background:linear-gradient(135deg, #fb923c 0%, #ea6c00 55%, #c2570a 100%);border-radius:20px 20px 0 0;padding:28px 32px;box-shadow:0 4px 20px rgba(234,108,0,0.25);">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
         <tr>
-          <td style="padding-right:12px;vertical-align:middle;">{_logo_img(72, 18)}</td>
-          <td style="vertical-align:middle;text-align:left;">
-            <div style="font-size:22px;font-weight:900;color:#fff;letter-spacing:-0.5px;">Negen SDD</div>
-            <div style="font-size:10px;color:rgba(255,255,255,0.65);letter-spacing:2px;text-transform:uppercase;margin-top:2px;">Secure Document Dissemination</div>
+          <td style="vertical-align:middle;">
+            <table cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding-right:14px;vertical-align:middle;">{_logo_img(48, 12)}</td>
+                <td style="vertical-align:middle;">
+                  <div style="font-size:20px;font-weight:800;color:#ffffff;letter-spacing:-0.4px;line-height:1.2;">Negen SDD</div>
+                  <div style="font-size:10px;color:rgba(255,255,255,0.85);letter-spacing:1.5px;text-transform:uppercase;font-weight:600;margin-top:2px;">Secure Document Dissemination</div>
+                </td>
+              </tr>
+            </table>
+          </td>
+          <td align="right" style="vertical-align:middle;">
+            <span style="background:rgba(255,255,255,0.22);border:1px solid rgba(255,255,255,0.4);color:#ffffff;font-size:10px;font-weight:700;padding:4px 12px;border-radius:99px;letter-spacing:1px;text-transform:uppercase;">
+              NEW ACCOUNT
+            </span>
           </td>
         </tr>
       </table>
     </td>
   </tr>
 
-  <!-- BODY -->
+  <!-- MAIN BODY SURFACE -->
   <tr>
-    <td style="background:#fff;padding:32px 32px 0;">
-      <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#1e293b;">Welcome, {name}! &#128075;</h1>
-      <p style="margin:0 0 24px;font-size:14px;color:#64748b;line-height:1.6;">
-        Your Negen SDD account has been created. Here are your credentials — activate your account using the button below.
-      </p>
+    <td style="background:#ffffff;border-left:1px solid #E0D8CC;border-right:1px solid #E0D8CC;padding:32px 32px 28px;">
+      
+      <!-- Greeting & Summary -->
+      <div style="font-size:18px;font-weight:800;color:#1f2937;margin-bottom:6px;">
+        Account Ready for {name}
+      </div>
+      <div style="font-size:13px;color:#6b7585;line-height:1.5;margin-bottom:24px;">
+        Your official Negen SDD portal credentials have been provisioned. Below is your account dataset.
+      </div>
 
-      <!-- LIGHT ID CARD -->
-      <table width="100%" cellpadding="0" cellspacing="0" border="0"
-             style="background:#f8fafc;border:2px solid #e2e8f0;border-radius:16px;margin-bottom:24px;">
+      <!-- DATASET ID CARD -->
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F9F8F5;border:1px solid #E0D8CC;border-radius:14px;margin-bottom:24px;overflow:hidden;">
         <tr>
-          <td width="6" style="background:{accent};border-radius:14px 0 0 14px;">&nbsp;</td>
-          <td style="padding:22px 20px;">
-
-            <!-- Card header -->
-            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:16px;">
+          <td style="padding:20px;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              
+              <!-- Card Header Row -->
               <tr>
-                <td>
-                  <div style="font-size:9px;font-weight:700;letter-spacing:2px;color:#94a3b8;text-transform:uppercase;">Identity Card</div>
-                  <div style="font-size:10px;color:#cbd5e1;margin-top:1px;">Negen SDD Portal</div>
+                <td style="padding-bottom:14px;border-bottom:1px solid #E8EAED;">
+                  <div style="font-size:10px;font-weight:700;letter-spacing:1.2px;color:#9aa3b8;text-transform:uppercase;">USER IDENTIFIER DATASET</div>
                 </td>
-                <td align="right">
-                  <span style="background:{accent};color:#fff;font-size:10px;font-weight:700;
-                               padding:3px 12px;border-radius:999px;text-transform:uppercase;letter-spacing:0.5px;">
-                    {role_label}
+                <td align="right" style="padding-bottom:14px;border-bottom:1px solid #E8EAED;">
+                  <span style="background:{badge_bg};color:{badge_color};border:1px solid {badge_color}40;font-size:10px;font-weight:800;padding:3px 10px;border-radius:99px;letter-spacing:0.5px;">
+                    {role_label.upper()}
                   </span>
                 </td>
               </tr>
-            </table>
 
-            <!-- Avatar + name -->
-            <table cellpadding="0" cellspacing="0" border="0" style="margin-bottom:16px;">
+              <!-- Avatar & Core Info -->
               <tr>
-                <td style="padding-right:14px;">
-                  <table cellpadding="0" cellspacing="0" border="0">
+                <td colspan="2" style="padding-top:16px;padding-bottom:16px;">
+                  <table cellpadding="0" cellspacing="0" border="0" width="100%">
                     <tr>
-                      <td style="width:54px;height:54px;border-radius:50%;background:{light_bg};
-                                 text-align:center;vertical-align:middle;font-size:22px;
-                                 font-weight:800;color:{accent};line-height:54px;
-                                 border:2px solid {accent};">
-                        {initial}
+                      <td width="48" style="vertical-align:middle;padding-right:14px;">
+                        <div style="width:48px;height:48px;border-radius:50%;background:#ea6c00;color:#ffffff;font-size:20px;font-weight:800;line-height:48px;text-align:center;box-shadow:0 2px 8px rgba(234,108,0,0.3);">
+                          {initial}
+                        </div>
+                      </td>
+                      <td style="vertical-align:middle;">
+                        <div style="font-size:15px;font-weight:700;color:#1f2937;line-height:1.2;">{name}</div>
+                        <div style="font-size:12px;color:#6b7585;margin-top:3px;">{email}</div>
                       </td>
                     </tr>
                   </table>
                 </td>
-                <td>
-                  <div style="font-size:18px;font-weight:800;color:#1e293b;">{name}</div>
-                  <div style="font-size:12px;color:#64748b;margin-top:2px;">{email}</div>
-                </td>
               </tr>
-            </table>
 
-            <!-- Divider -->
-            <div style="height:1px;background:#e2e8f0;margin-bottom:14px;"></div>
-
-            <!-- ID + role row -->
-            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <!-- Key Value Table -->
               <tr>
-                <td>
-                  <div style="font-size:9px;font-weight:600;letter-spacing:1px;color:#94a3b8;text-transform:uppercase;margin-bottom:4px;">User ID</div>
-                  <span style="font-family:'Courier New',monospace;font-size:12px;font-weight:700;
-                               color:#1e293b;background:#e2e8f0;padding:4px 10px;border-radius:6px;">
-                    {public_id}
-                  </span>
-                </td>
-                <td align="right">
-                  <div style="font-size:9px;font-weight:600;letter-spacing:1px;color:#94a3b8;text-transform:uppercase;margin-bottom:4px;">Access Level</div>
-                  <span style="font-size:13px;font-weight:700;color:{accent};">{role_label}</span>
+                <td colspan="2" style="border-top:1px solid #E8EAED;padding-top:14px;">
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td width="50%" style="vertical-align:top;padding-right:8px;">
+                        <div style="font-size:10px;font-weight:600;color:#9aa3b8;text-transform:uppercase;margin-bottom:3px;">Public User ID</div>
+                        <div style="font-family:'Courier New', Consolas, monospace;font-size:12px;font-weight:700;color:#1f2937;background:#E8EAED;display:inline-block;padding:3px 8px;border-radius:6px;">
+                          {public_id}
+                        </div>
+                      </td>
+                      <td width="50%" style="vertical-align:top;padding-left:8px;">
+                        <div style="font-size:10px;font-weight:600;color:#9aa3b8;text-transform:uppercase;margin-bottom:3px;">Account Status</div>
+                        <div style="font-size:12px;font-weight:700;color:#c2570a;">
+                          Pending Password Setup
+                        </div>
+                      </td>
+                    </tr>
+                  </table>
                 </td>
               </tr>
-            </table>
 
+            </table>
           </td>
         </tr>
       </table>
-      <!-- END ID CARD -->
 
-      <!-- Info box -->
+      <!-- CTA ACTION BUTTON -->
       <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
         <tr>
-          <td style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:14px 16px;
-                     font-size:13px;color:#475569;line-height:1.6;">
-            &#128272; <strong style="color:#1e293b;">Next Step:</strong>
-            Click below to set your password. The link is time-sensitive.
-          </td>
-        </tr>
-      </table>
-
-      <!-- CTA -->
-      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:32px;">
-        <tr>
           <td align="center">
-            <a href="{setup_url}"
-               style="display:inline-block;background:linear-gradient(135deg,#CA5728,#8b2e0e);
-                      color:#fff;font-size:15px;font-weight:700;text-decoration:none;
-                      padding:14px 44px;border-radius:12px;letter-spacing:0.3px;">
-              &#10022; &nbsp;Activate My Account
+            <a href="{setup_url}" target="_blank" style="display:inline-block;background:linear-gradient(135deg, #ea6c00 0%, #c2570a 100%);color:#ffffff;font-size:14px;font-weight:700;text-decoration:none;padding:14px 36px;border-radius:10px;box-shadow:0 4px 14px rgba(234,108,0,0.35);letter-spacing:0.3px;">
+              Activate Account &amp; Set Password &rarr;
             </a>
           </td>
         </tr>
       </table>
 
-      <div style="height:1px;background:#f1f5f9;"></div>
+      <!-- Minimal Direct Link snippet -->
+      <div style="background:#F9F8F5;border:1px solid #E8EAED;border-radius:8px;padding:10px 12px;font-size:11px;color:#6b7585;line-height:1.4;word-break:break-all;">
+        <span style="font-weight:700;color:#374151;">Direct Link:</span> <a href="{setup_url}" style="color:#ea6c00;text-decoration:none;">{setup_url}</a>
+      </div>
+
     </td>
   </tr>
 
   <!-- FOOTER -->
   <tr>
-    <td style="background:#f8fafc;border-radius:0 0 18px 18px;padding:20px 32px;text-align:center;">
-      <p style="margin:0 0 4px;font-size:11px;color:#94a3b8;">If you did not expect this email, you can safely ignore it.</p>
-      <p style="margin:0;font-size:11px;color:#cbd5e1;">
-        &copy; 2025 <strong style="color:#CA5728;">Negen SDD</strong> &mdash; Secure Document Dissemination Platform
-      </p>
+    <td style="background:#F9F8F5;border:1px solid #E0D8CC;border-top:none;border-radius:0 0 20px 20px;padding:20px 32px;text-align:center;">
+      <div style="font-size:11px;color:#9aa3b8;margin-bottom:4px;">Automated system email from Negen SDD. Please do not reply directly.</div>
+      <div style="font-size:11px;color:#6b7585;font-weight:600;">
+        &copy; Negen SDD &bull; Secure Document Dissemination Platform
+      </div>
     </td>
   </tr>
 
@@ -253,118 +324,218 @@ def get_account_created_email(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# EMAIL 2 — Password Reset
+# TEMPLATE 2 — Password Reset Request (Slate & Obsidian Dark Security Theme)
 # ══════════════════════════════════════════════════════════════════════════════
 def get_password_reset_email(name: str, email: str, reset_url: str) -> tuple[str, str]:
     """Returns (subject, html_body) for the Password Reset email."""
 
-    subject = "Negen SDD \u2013 Password Reset Request"
+    subject = "Negen SDD – Security Alert: Password Reset Request"
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Reset Your Password</title>
+<title>Password Reset Request</title>
 </head>
-<body style="margin:0;padding:0;background:#f1f5f9;font-family:'Segoe UI',Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f1f5f9;padding:32px 12px;">
+<body style="margin:0;padding:0;background-color:#F9F8F5;font-family:'Inter', -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;-webkit-font-smoothing:antialiased;">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F9F8F5;padding:40px 16px;">
 <tr><td align="center">
 <table width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;">
 
-  <!-- HEADER -->
+  <!-- SECURITY HEADER (DARK SLATE) -->
   <tr>
-    <td style="background:linear-gradient(135deg,#1e293b,#0f172a);border-radius:18px 18px 0 0;padding:32px;text-align:center;">
-      <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin-bottom:20px;">
+    <td style="background:linear-gradient(135deg, #1e2937 0%, #0f172a 100%);border-radius:20px 20px 0 0;padding:28px 32px;box-shadow:0 4px 20px rgba(15,23,42,0.3);">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
         <tr>
-          <td style="padding-right:12px;vertical-align:middle;">{_logo_img(72, 18)}</td>
-          <td style="vertical-align:middle;text-align:left;">
-            <div style="font-size:22px;font-weight:900;color:#fff;letter-spacing:-0.5px;">Negen SDD</div>
-            <div style="font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:2px;text-transform:uppercase;margin-top:2px;">Secure Document Dissemination</div>
+          <td style="vertical-align:middle;">
+            <table cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding-right:14px;vertical-align:middle;">{_logo_img(48, 12)}</td>
+                <td style="vertical-align:middle;">
+                  <div style="font-size:20px;font-weight:800;color:#ffffff;letter-spacing:-0.4px;line-height:1.2;">Negen SDD</div>
+                  <div style="font-size:10px;color:rgba(255,255,255,0.65);letter-spacing:1.5px;text-transform:uppercase;font-weight:600;margin-top:2px;">Security &amp; Account Governance</div>
+                </td>
+              </tr>
+            </table>
+          </td>
+          <td align="right" style="vertical-align:middle;">
+            <span style="background:rgba(234,108,0,0.25);border:1px solid #ea6c00;color:#fb923c;font-size:10px;font-weight:800;padding:4px 12px;border-radius:99px;letter-spacing:1px;text-transform:uppercase;">
+              PASSWORD RESET
+            </span>
           </td>
         </tr>
       </table>
-      <div style="display:inline-block;background:rgba(202,87,40,0.15);border:2px solid rgba(202,87,40,0.35);
-                  border-radius:50%;width:52px;height:52px;line-height:52px;font-size:24px;margin-bottom:12px;">
-        &#128273;
-      </div>
-      <div style="font-size:22px;font-weight:900;color:#fff;margin-bottom:4px;">Password Reset</div>
-      <p style="margin:0;color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;">
-        Security &bull; Account Access
-      </p>
     </td>
   </tr>
 
-  <!-- BODY -->
+  <!-- MAIN BODY SURFACE -->
   <tr>
-    <td style="background:#fff;padding:32px 32px 0;">
-      <h2 style="margin:0 0 8px;font-size:20px;font-weight:800;color:#1e293b;">Hi, {name}!</h2>
-      <p style="margin:0 0 24px;font-size:14px;color:#64748b;line-height:1.7;">
-        We received a request to reset the password for the Negen SDD account associated with
-        <strong style="color:#1e293b;">{email}</strong>.
-        If this was you, click the button below to choose a new password.
-      </p>
+    <td style="background:#ffffff;border-left:1px solid #E0D8CC;border-right:1px solid #E0D8CC;padding:32px 32px 28px;">
+      
+      <!-- Security Heading -->
+      <div style="font-size:18px;font-weight:800;color:#1f2937;margin-bottom:6px;">
+        Password Reset Requested
+      </div>
+      <div style="font-size:13px;color:#6b7585;line-height:1.5;margin-bottom:20px;">
+        A password reset request was initialized for the account associated with <strong style="color:#1f2937;">{email}</strong>.
+      </div>
 
-      <!-- CTA -->
-      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px;">
+      <!-- SECURITY DATASET SUMMARY BOX -->
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F9F8F5;border:1px solid #E0D8CC;border-radius:14px;margin-bottom:20px;">
+        <tr>
+          <td style="padding:18px 20px;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding-bottom:10px;border-bottom:1px solid #E8EAED;">
+                  <div style="font-size:10px;font-weight:700;letter-spacing:1.2px;color:#9aa3b8;text-transform:uppercase;">REQUEST DETAILS</div>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding-top:12px;">
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td style="font-size:12px;color:#6b7585;padding-bottom:6px;">Account User:</td>
+                      <td align="right" style="font-size:12px;font-weight:700;color:#1f2937;padding-bottom:6px;">{name}</td>
+                    </tr>
+                    <tr>
+                      <td style="font-size:12px;color:#6b7585;padding-bottom:6px;">Target Email:</td>
+                      <td align="right" style="font-size:12px;font-weight:700;color:#1f2937;padding-bottom:6px;">{email}</td>
+                    </tr>
+                    <tr>
+                      <td style="font-size:12px;color:#6b7585;">Token Validity:</td>
+                      <td align="right" style="font-size:12px;font-weight:700;color:#d97706;">Time-Sensitive Single-Use</td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+
+      <!-- CTA ACTION BUTTON -->
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
         <tr>
           <td align="center">
-            <a href="{reset_url}"
-               style="display:inline-block;background:linear-gradient(135deg,#CA5728,#8b2e0e);
-                      color:#fff;font-size:15px;font-weight:700;text-decoration:none;
-                      padding:14px 44px;border-radius:12px;letter-spacing:0.3px;">
-              &#128274; &nbsp;Reset My Password
+            <a href="{reset_url}" target="_blank" style="display:inline-block;background:linear-gradient(135deg, #ea6c00 0%, #c2570a 100%);color:#ffffff;font-size:14px;font-weight:700;text-decoration:none;padding:14px 36px;border-radius:10px;box-shadow:0 4px 14px rgba(234,108,0,0.35);letter-spacing:0.3px;">
+              Reset Password Now &rarr;
             </a>
           </td>
         </tr>
       </table>
 
-      <!-- Warning -->
-      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:14px;">
+      <!-- AMBER SECURITY NOTICE -->
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#fffbeb;border:1px solid #fef3c7;border-radius:10px;margin-bottom:20px;">
         <tr>
-          <td style="background:#fffbeb;border:1.5px solid #fcd34d;border-radius:12px;padding:14px 16px;">
-            <table cellpadding="0" cellspacing="0" border="0"><tr>
-              <td style="padding-right:10px;font-size:18px;vertical-align:top;">&#9888;&#65039;</td>
-              <td style="font-size:13px;color:#92400e;line-height:1.6;">
-                <strong>This link will expire shortly.</strong> If it has expired, request a new one from the login page.
-              </td>
-            </tr></table>
+          <td style="padding:12px 16px;">
+            <div style="font-size:12px;color:#b45309;line-height:1.5;">
+              <strong style="color:#92400e;">Did not request this change?</strong> You can safely disregard this message. Your existing password remains unchanged and secure.
+            </div>
           </td>
         </tr>
       </table>
 
-      <!-- Not you -->
-      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px;">
-        <tr>
-          <td style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:14px 16px;">
-            <table cellpadding="0" cellspacing="0" border="0"><tr>
-              <td style="padding-right:10px;font-size:18px;vertical-align:top;">&#128737;&#65039;</td>
-              <td style="font-size:13px;color:#475569;line-height:1.6;">
-                <strong style="color:#1e293b;">Didn't request this?</strong>
-                You can safely ignore this email. Your password will remain unchanged.
-              </td>
-            </tr></table>
-          </td>
-        </tr>
-      </table>
+      <!-- Direct link snippet -->
+      <div style="background:#F9F8F5;border:1px solid #E8EAED;border-radius:8px;padding:10px 12px;font-size:11px;color:#6b7585;line-height:1.4;word-break:break-all;">
+        <span style="font-weight:700;color:#374151;">Direct Link:</span> <a href="{reset_url}" style="color:#ea6c00;text-decoration:none;">{reset_url}</a>
+      </div>
 
-      <!-- Fallback URL -->
-      <p style="font-size:11px;color:#94a3b8;margin:0 0 24px;line-height:1.6;word-break:break-all;">
-        Button not working? Paste this link in your browser:<br/>
-        <span style="color:#CA5728;">{reset_url}</span>
-      </p>
-
-      <div style="height:1px;background:#f1f5f9;"></div>
     </td>
   </tr>
 
   <!-- FOOTER -->
   <tr>
-    <td style="background:#f8fafc;border-radius:0 0 18px 18px;padding:20px 32px;text-align:center;">
-      <p style="margin:0 0 4px;font-size:11px;color:#94a3b8;">This is an automated security email. Please do not reply.</p>
-      <p style="margin:0;font-size:11px;color:#cbd5e1;">
-        &copy; 2025 <strong style="color:#CA5728;">Negen SDD</strong> &mdash; Secure Document Dissemination Platform
-      </p>
+    <td style="background:#F9F8F5;border:1px solid #E0D8CC;border-top:none;border-radius:0 0 20px 20px;padding:20px 32px;text-align:center;">
+      <div style="font-size:11px;color:#9aa3b8;margin-bottom:4px;">Automated security notification from Negen SDD.</div>
+      <div style="font-size:11px;color:#6b7585;font-weight:600;">
+        &copy; Negen SDD &bull; Secure Document Dissemination Platform
+      </div>
+    </td>
+  </tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>"""
+
+    return subject, html
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TEMPLATE 3 — Password Successfully Changed (Security Confirmation Helper)
+# ══════════════════════════════════════════════════════════════════════════════
+def get_password_changed_email(name: str, email: str, timestamp_str: str) -> tuple[str, str]:
+    """Returns (subject, html_body) for Password Changed notification."""
+
+    subject = "Negen SDD – Security Alert: Password Updated"
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Password Updated</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F9F8F5;font-family:'Inter', -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;-webkit-font-smoothing:antialiased;">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F9F8F5;padding:40px 16px;">
+<tr><td align="center">
+<table width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;">
+
+  <!-- HEADER -->
+  <tr>
+    <td style="background:linear-gradient(135deg, #059669 0%, #047857 100%);border-radius:20px 20px 0 0;padding:28px 32px;box-shadow:0 4px 20px rgba(5,150,105,0.25);">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td style="vertical-align:middle;">
+            <table cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding-right:14px;vertical-align:middle;">{_logo_img(48, 12)}</td>
+                <td style="vertical-align:middle;">
+                  <div style="font-size:20px;font-weight:800;color:#ffffff;letter-spacing:-0.4px;line-height:1.2;">Negen SDD</div>
+                  <div style="font-size:10px;color:rgba(255,255,255,0.85);letter-spacing:1.5px;text-transform:uppercase;font-weight:600;margin-top:2px;">Security Confirmation</div>
+                </td>
+              </tr>
+            </table>
+          </td>
+          <td align="right" style="vertical-align:middle;">
+            <span style="background:rgba(255,255,255,0.25);color:#ffffff;font-size:10px;font-weight:800;padding:4px 12px;border-radius:99px;letter-spacing:1px;text-transform:uppercase;">
+              CONFIRMED
+            </span>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- BODY -->
+  <tr>
+    <td style="background:#ffffff;border-left:1px solid #E0D8CC;border-right:1px solid #E0D8CC;padding:32px 32px 28px;">
+      <div style="font-size:18px;font-weight:800;color:#1f2937;margin-bottom:6px;">Password Successfully Changed</div>
+      <div style="font-size:13px;color:#6b7585;line-height:1.5;margin-bottom:20px;">
+        Your password for Negen SDD account <strong style="color:#1f2937;">{email}</strong> was updated successfully.
+      </div>
+
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F9F8F5;border:1px solid #E0D8CC;border-radius:14px;padding:16px 20px;margin-bottom:20px;">
+        <tr>
+          <td style="font-size:12px;color:#6b7585;">Update Timestamp:</td>
+          <td align="right" style="font-size:12px;font-weight:700;color:#1f2937;">{timestamp_str}</td>
+        </tr>
+      </table>
+
+      <div style="font-size:12px;color:#dc2626;background:#fef2f2;border:1px solid #fee2e2;border-radius:8px;padding:12px 14px;line-height:1.4;">
+        <strong>Unrecognized activity?</strong> Contact your Negen SDD administrator immediately to safeguard your account.
+      </div>
+    </td>
+  </tr>
+
+  <!-- FOOTER -->
+  <tr>
+    <td style="background:#F9F8F5;border:1px solid #E0D8CC;border-top:none;border-radius:0 0 20px 20px;padding:20px 32px;text-align:center;">
+      <div style="font-size:11px;color:#6b7585;font-weight:600;">
+        &copy; Negen SDD &bull; Secure Document Dissemination Platform
+      </div>
     </td>
   </tr>
 

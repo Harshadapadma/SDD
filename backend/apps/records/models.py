@@ -19,7 +19,7 @@ class Record(models.Model):
     designation = models.CharField(max_length=255)
     employee_code = models.CharField(max_length=50)
 
-    pan = models.CharField(max_length=20)
+    pan = models.CharField(max_length=255)
 
     source_company = models.CharField(max_length=255)
     info_details = models.TextField()
@@ -27,7 +27,8 @@ class Record(models.Model):
     info_received_date = models.DateField()
 
     disclosure_name = models.CharField(max_length=255)
-    disclosure_designation = models.CharField(max_length=255)
+    disclosure_designation = models.CharField(max_length=255, blank=True, null=True, default='')
+    disclosure_department = models.CharField(max_length=255, blank=True, null=True, default='')
 
     # Metadata
     created_by = models.ForeignKey(
@@ -47,15 +48,38 @@ class Record(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ('PENDING_CREATION', 'Pending Creation'),
+            ('APPROVED', 'Approved'),
+            ('PENDING_EDITION', 'Pending Edition'),
+            ('REJECTED', 'Rejected'),
+        ],
+        default='PENDING_CREATION'
+    )
+
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        """
+        Decrypt AES-256 encrypted fields when instance is loaded from DB.
+        """
+        instance = super().from_db(db, field_names, values)
+        from .encryption import decrypt_val
+        if instance.pan:
+            instance.pan = decrypt_val(instance.pan)
+        if instance.info_details:
+            instance.info_details = decrypt_val(instance.info_details)
+        return instance
+
     def save(self, *args, **kwargs):
         """
-        Generate public_id like NR-2026-0001
-        Resets sequence every year
+        Generate public_id like NR-2026-0001 & encrypt sensitive fields at rest before writing to disk.
         """
+        from .encryption import encrypt_val
         if not self.public_id:
             current_year = timezone.now().year
 
-            # Get last record for current year
             last_record = Record.objects.filter(
                 public_id__startswith=f"NR-{current_year}"
             ).order_by('-id').first()
@@ -67,6 +91,11 @@ class Record(models.Model):
                 new_number = 1
 
             self.public_id = f"NR-{current_year}-{new_number:04d}"
+
+        if self.pan:
+            self.pan = encrypt_val(self.pan)
+        if self.info_details:
+            self.info_details = encrypt_val(self.info_details)
 
         super().save(*args, **kwargs)
 

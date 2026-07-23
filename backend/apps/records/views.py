@@ -10,7 +10,7 @@ from .serializers import RecordCreateSerializer, RecordListSerializer, RecordDet
 
 from apps.users.models import User
 from apps.notifications.models import Notification  # 🔥 added
-from apps.workflows.models import DeleteRequest
+from apps.workflows.models import DeleteRequest, CreationRequest, EditRequest
 
 
 # -------------------------------
@@ -28,7 +28,7 @@ class CreateRecordView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        if request.user.role not in ["ADMIN", "COLLABORATOR"]:
+        if request.user.role not in ["COLLABORATOR", "COMPLIANCE_OFFICER"]:
             return Response(
                 {"error": "Permission denied"},
                 status=status.HTTP_403_FORBIDDEN
@@ -42,10 +42,38 @@ class CreateRecordView(APIView):
         if serializer.is_valid():
             record = serializer.save()
 
-            return Response({
-                "message": "Record created successfully",
-                "record_id": record.public_id
-            }, status=status.HTTP_201_CREATED)
+            if request.user.role == "COMPLIANCE_OFFICER":
+                record.status = 'APPROVED'
+                record.save()
+
+                return Response({
+                    "message": "Record created successfully",
+                    "record_id": record.public_id
+                }, status=status.HTTP_201_CREATED)
+            else:
+                record.status = 'PENDING_CREATION'
+                record.save()
+
+                # Create creation request
+                CreationRequest.objects.create(
+                    record=record,
+                    requested_by=request.user
+                )
+
+                # Notify Compliance Officers
+                officers = User.objects.filter(role="COMPLIANCE_OFFICER")
+                for officer in officers:
+                    Notification.objects.create(
+                        user=officer,
+                        title="Record Creation Request",
+                        message=f"{request.user.name} requested creation of record {record.public_id}",
+                        type="INFO"
+                    )
+
+                return Response({
+                    "message": "Record creation request submitted for approval",
+                    "record_id": record.public_id
+                }, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -60,11 +88,14 @@ class RecordListView(APIView):
         user = request.user
 
         # 🔐 ACCESS CONTROL
-        if user.role == "ADMIN":
+        if user.role == "COMPLIANCE_OFFICER":
             queryset = Record.objects.all()
+        elif user.role == "ADMIN":
+            return Response({"error": "Permission denied. Admins cannot view records."}, status=status.HTTP_403_FORBIDDEN)
         else:
             queryset = Record.objects.filter(
-                user_access__user=user
+                Q(user_access__user=user, status='APPROVED') |
+                Q(created_by=user, status='PENDING_CREATION')
             )
 
         queryset = queryset.order_by('-created_at')
@@ -94,9 +125,9 @@ class AssignRecordView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        if request.user.role != "ADMIN":
+        if request.user.role not in ["ADMIN", "COMPLIANCE_OFFICER"]:
             return Response(
-                {"error": "Only admin can assign records"},
+                {"error": "Only admin or compliance officer can assign records"},
                 status=status.HTTP_403_FORBIDDEN
             )
 
@@ -110,6 +141,18 @@ class AssignRecordView(APIView):
         except:
             return Response(
                 {"error": "Invalid user_id or record_id"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if user.role == "VIEWER" and access_type == "EDIT":
+            return Response(
+                {"error": "Full edit access can't be given unless the user is a Collaborator."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if record.status != 'APPROVED':
+            return Response(
+                {"error": "Cannot assign access to an unapproved record"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -153,8 +196,37 @@ class UpdateRecordView(APIView):
 
         user = request.user
 
+        # If it's a pending creation request and the user is the creator, let them update it directly
+        if record.status == 'PENDING_CREATION':
+            if record.created_by != user:
+                return Response(
+                    {"error": "Permission denied. Only the creator can edit a pending record."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            serializer = RecordCreateSerializer(
+                record,
+                data=request.data,
+                partial=True,
+                context={"request": request}
+            )
+            if serializer.is_valid():
+                serializer.save(updated_by=user)
+                return Response({
+                    "message": "Pending record updated successfully",
+                    "record_id": record.public_id
+                })
+            return Response(serializer.errors, status=400)
+
+        # For approved records, perform normal check and edit request flow
+        if record.status != 'APPROVED':
+            return Response(
+                {"error": "Cannot edit an unapproved record"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         # 🔐 ACCESS CONTROL
-        if user.role != "ADMIN":
+        if user.role not in ["ADMIN", "COMPLIANCE_OFFICER"]:
             has_access = RecordAccess.objects.filter(
                 user=user,
                 record=record,
@@ -170,14 +242,30 @@ class UpdateRecordView(APIView):
         serializer = RecordCreateSerializer(
             record,
             data=request.data,
-            partial=True
+            partial=True,
+            context={"request": request}
         )
 
         if serializer.is_valid():
-            serializer.save(updated_by=user)
+            # Create Edit Request instead of saving directly
+            EditRequest.objects.create(
+                record=record,
+                requested_by=user,
+                proposed_data=request.data
+            )
+
+            # Notify Compliance Officers
+            officers = User.objects.filter(role="COMPLIANCE_OFFICER")
+            for officer in officers:
+                Notification.objects.create(
+                    user=officer,
+                    title="Record Edit Request",
+                    message=f"{user.name} requested edit of record {record.public_id}",
+                    type="WARNING"
+                )
 
             return Response({
-                "message": "Record updated successfully"
+                "message": "Record edit request submitted for approval"
             })
 
         return Response(serializer.errors, status=400)
@@ -195,25 +283,40 @@ class DeleteRecordView(APIView):
         except Record.DoesNotExist:
             return Response({"error": "Record not found"}, status=404)
 
+        if record.status != 'APPROVED':
+            return Response(
+                {"error": "Cannot request deletion of an unapproved record"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         user = request.user
 
-        if user.role == "ADMIN":
-            record.delete()
-            return Response({"message": "Record deleted successfully"}, status=status.HTTP_200_OK)
-        elif user.role == "COLLABORATOR":
-            DeleteRequest.objects.create(record=record, requested_by=user)
-            # Notify admins
-            admins = User.objects.filter(role="ADMIN")
-            for admin in admins:
-                Notification.objects.create(
-                    user=admin,
-                    title="Delete Request",
-                    message=f"{user.name} requested to delete record {record.public_id}",
-                    type="WARNING"
-                )
-            return Response({"message": "Delete request sent to admin for approval"}, status=status.HTTP_202_ACCEPTED)
-        else:
+        if user.role not in ["ADMIN", "COLLABORATOR"]:
             return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+
+        if user.role == "COLLABORATOR":
+            has_access = RecordAccess.objects.filter(
+                user=user,
+                record=record,
+                access_type="EDIT"
+            ).exists()
+            if not has_access:
+                return Response({"error": "No delete permission"}, status=status.HTTP_403_FORBIDDEN)
+
+        # Create Delete Request
+        DeleteRequest.objects.create(record=record, requested_by=user)
+
+        # Notify Compliance Officers
+        officers = User.objects.filter(role="COMPLIANCE_OFFICER")
+        for officer in officers:
+            Notification.objects.create(
+                user=officer,
+                title="Delete Request",
+                message=f"{user.name} requested to delete record {record.public_id}",
+                type="WARNING"
+            )
+
+        return Response({"message": "Delete request sent to Compliance Officer for approval"}, status=status.HTTP_202_ACCEPTED)
 
 
 # -------------------------------
@@ -231,7 +334,11 @@ class RecordDetailView(APIView):
         user = request.user
         
         # 🔐 ACCESS CONTROL
-        if user.role != "ADMIN":
+        if user.role == "ADMIN":
+            return Response({"error": "Permission denied. Admins cannot view records."}, status=status.HTTP_403_FORBIDDEN)
+        elif user.role != "COMPLIANCE_OFFICER":
+            if record.status == 'PENDING_CREATION' and record.created_by != user:
+                return Response({"error": "Permission denied"}, status=403)
             has_access = RecordAccess.objects.filter(user=user, record=record).exists()
             if not has_access:
                 return Response({"error": "Permission denied"}, status=403)
@@ -240,8 +347,8 @@ class RecordDetailView(APIView):
         serializer = RecordDetailSerializer(record, context={"request": request})
         data = serializer.data
 
-        # If admin, add access details
-        if user.role == "ADMIN":
+        # If admin or compliance officer, add access details
+        if user.role in ["ADMIN", "COMPLIANCE_OFFICER"]:
             accesses = RecordAccess.objects.filter(record=record)
             access_list = []
             for acc in accesses:

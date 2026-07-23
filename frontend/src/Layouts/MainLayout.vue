@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useRouter } from "vue-router";
+import api from "../api/client";
 
 const router = useRouter();
 const isOpen = ref(false);
@@ -9,7 +10,10 @@ const toggleMenu = () => {
   isOpen.value = !isOpen.value;
 };
 
-const logout = () => {
+const logout = async () => {
+  try {
+    await api.post("auth/logout/");
+  } catch (_) {}
   localStorage.clear();
   router.push("/login");
 };

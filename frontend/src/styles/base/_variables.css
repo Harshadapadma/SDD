@@ -1,17 +1,323 @@
+/* ═══════════════════════════════════════════════════════════════
+   NEGEN SDD — DESIGN SYSTEM TOKENS
+   ═══════════════════════════════════════════════════════════════ */
+
 :root {
-  --color-primary: #4f46e5;
-  --color-bg: #ffffff;
-  --color-text: #111827;
 
-  --spacing-sm: 8px;
-  --spacing-md: 16px;
-  --spacing-lg: 24px;
+  /* ── Brand: Orange Palette ─────────────────────────────────── */
+  --orange-50: #fff7ed;
+  --orange-100: #ffedd5;
+  --orange-200: #fed7aa;
+  --orange-300: #fdba74;
+  --orange-400: #fb923c;
+  --orange-500: #f97316;
+  --orange-600: #ea6c00;
+  --orange-700: #c2570a;
+  --orange-800: #9a3c0e;
 
-  --radius-md: 8px;
+  --orange-accent: var(--orange-600);
+  --orange-hover: var(--orange-700);
+  --orange-bg-subtle: var(--orange-50);
+  --orange-bg-light: rgba(234, 108, 0, 0.10);
+  --orange-glow: rgba(234, 108, 0, 0.25);
+  --orange-border: rgba(234, 108, 0, 0.30);
+  --orange-gradient: linear-gradient(135deg, #fb923c 0%, #ea6c00 55%, #c2570a 100%);
+  --orange-gradient-soft: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+
+  /* ── Neutral Palette ──────────────────────────────────────── */
+  --neutral-0: #ffffff;
+  --neutral-50: #f8f9fb;
+  --neutral-100: #f1f3f6;
+  --neutral-150: #e8eaed;
+  --neutral-200: #dde1e7;
+  --neutral-300: #c4cbd6;
+  --neutral-400: #9aa3b0;
+  --neutral-500: #6b7585;
+  --neutral-600: #4a5568;
+  --neutral-700: #374151;
+  --neutral-800: #1f2937;
+  --neutral-900: #111827;
+
+  /* ── Semantic Colors ──────────────────────────────────────── */
+  --success-50: #f0fdf4;
+  --success-100: #dcfce7;
+  --success-500: #22c55e;
+  --success-600: #16a34a;
+  --success-700: #15803d;
+  --success-bg: rgba(34, 197, 94, 0.10);
+  --success-border: rgba(34, 197, 94, 0.30);
+
+  --error-50: #fef2f2;
+  --error-100: #fee2e2;
+  --error-500: #ef4444;
+  --error-600: #dc2626;
+  --error-700: #b91c1c;
+  --error-bg: rgba(239, 68, 68, 0.10);
+  --error-border: rgba(239, 68, 68, 0.30);
+
+  --warning-50: #fffbeb;
+  --warning-100: #fef3c7;
+  --warning-500: #f59e0b;
+  --warning-600: #d97706;
+  --warning-700: #b45309;
+  --warning-bg: rgba(245, 158, 11, 0.10);
+  --warning-border: rgba(245, 158, 11, 0.30);
+
+  --info-50: #eff6ff;
+  --info-100: #dbeafe;
+  --info-500: #3b82f6;
+  --info-600: #2563eb;
+  --info-700: #1d4ed8;
+  --info-bg: rgba(59, 130, 246, 0.10);
+  --info-border: rgba(59, 130, 246, 0.30);
+
+  /* ── Layered Surface Architecture — Natural Earthy Grey Palette ── */
+  --bg-app: #F9F8F5;
+  /* Level 0: Outer App Background (Lighter Earthy Shade) */
+  --bg-sidebar: #ECE7DF;
+  /* Level 1: Sidebar Surface (Darker Earthy Shade) */
+  --bg-content: #ECE7DF;
+  /* Level 1.5: Content Area Surface (Darker Earthy Shade) */
+  --bg-card: rgba(255, 255, 255, 0.88);
+  /* Level 2: Tactile 3D Glassmorphic Cards (Borderless) */
+  --bg-input: #E0D8CC;
+  /* Level 2: Warm inset skeuomorphic cavity (no white) */
+  --bg-input-focus: #EAE2D7;
+  /* Illuminated active cavity (no white) */
+  --bg-glass: rgba(255, 255, 255, 0.88);
+  /* Level 4: Floating Glass Surface */
+
+  /* Aliases for backward compatibility */
+  --bg-page: var(--bg-app);
+  --bg-base: var(--bg-content);
+  --bg-surface: var(--bg-card);
+  --bg-raised: var(--bg-card);
+
+  /* ── Text Colors ─────────────────────────────────────────── */
+  --text-primary: var(--neutral-800);
+  --text-secondary: var(--neutral-700);
+  --text-muted: var(--neutral-600);
+  --text-disabled: var(--neutral-300);
+  --text-inverse: #ffffff;
+  --text-main: var(--neutral-800);
+  /* backward compat alias */
+
+  /* ── 3D Tactile Elevation Tokens (Borderless 3D Cards) ────────── */
+  --border-subtle: rgba(255, 255, 255, 0.40);
+  --border-default: transparent;
+  --border-active: var(--orange-accent);
+  --card-divider: #a6a9ad;
+
+  /* 3D Depth Shadow System: multi-layer elevation + top light rim highlight */
+  --shadow-xs: 0 2px 4px 0 rgba(35, 28, 20, 0.05), inset 0 1px 0 0 rgba(255, 255, 255, 0.90);
+  --shadow-sm: 0 4px 12px 0 rgba(35, 28, 20, 0.08), 0 1px 3px 0 rgba(35, 28, 20, 0.04), inset 0 1px 0 0 rgba(255, 255, 255, 0.95);
+  --shadow-md: 0 8px 24px -4px rgba(35, 28, 20, 0.12), 0 3px 8px -2px rgba(35, 28, 20, 0.06), inset 0 1px 0 0 rgba(255, 255, 255, 0.95);
+  --shadow-lg: 0 16px 32px -6px rgba(35, 28, 20, 0.14), 0 6px 14px -4px rgba(35, 28, 20, 0.08), inset 0 1px 0 0 rgba(255, 255, 255, 0.95);
+  --shadow-xl: 0 24px 36px -6px rgba(35, 28, 20, 0.16), 0 10px 14px -6px rgba(35, 28, 20, 0.10), inset 0 1px 0 0 rgba(255, 255, 255, 0.95);
+
+  /* Neomorphism backward-compatibility mapping to modern elevation */
+  --neu-light: #ffffff;
+  --neu-dark: #cbd5e1;
+  --neu-shadow: var(--shadow-sm);
+  --neu-white: var(--neu-light);
+
+  --neu-card: var(--shadow-sm);
+  --neu-flat-card: var(--neu-card);
+
+  --neu-btn: var(--shadow-xs);
+  --neu-flat-btn: var(--neu-btn);
+
+  --neu-inset: inset 0 3px 6px rgba(35, 28, 20, 0.16), inset 0 1px 2px rgba(35, 28, 20, 0.10), 0 1px 0 rgba(255, 255, 255, 0.70);
+  --neu-inset-input: var(--neu-inset);
+
+  --neu-pressed: inset 0 2px 4px rgba(35, 28, 20, 0.12), 0 1px 0 rgba(255, 255, 255, 0.70);
+  --neu-inset-active: var(--neu-pressed);
+
+  --neu-orange-btn: 0 2px 4px rgba(234, 108, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.05);
+  --neu-flat-orange: var(--neu-orange-btn);
+
+  --neu-card-hover: var(--shadow-md);
+
+  /* ── Glassmorphism Tokens ─────────────────────────────────── */
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-bg-dark: rgba(17, 24, 39, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.55);
+  --glass-border-muted: rgba(255, 255, 255, 0.30);
+  --glass-blur: blur(18px) saturate(1.6);
+  --glass-blur-sm: blur(10px) saturate(1.4);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  --glass-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.16);
+
+  /* Overlay (modal backdrops) */
+  --overlay-bg: rgba(17, 24, 39, 0.50);
+
+  /* ── Skeuomorphic Button Tokens ───────────────────────────── */
+  /* Primary orange button: multi-layer for tactile depth */
+  --sku-btn-primary-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.25) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.15) inset,
+    0 4px 8px rgba(194, 87, 10, 0.35),
+    0 1px 3px rgba(0, 0, 0, 0.15);
+  --sku-btn-primary-shadow-hover:
+    0 1px 0 rgba(255, 255, 255, 0.30) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.20) inset,
+    0 6px 14px rgba(194, 87, 10, 0.45),
+    0 2px 4px rgba(0, 0, 0, 0.15);
+  --sku-btn-primary-shadow-active:
+    0 -1px 0 rgba(255, 255, 255, 0.20) inset,
+    0 2px 0 rgba(0, 0, 0, 0.20) inset,
+    0 1px 3px rgba(0, 0, 0, 0.15);
+
+  /* Secondary / outline button */
+  --sku-btn-secondary-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.80) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.08) inset,
+    0 2px 5px rgba(0, 0, 0, 0.10);
+  --sku-btn-secondary-shadow-hover:
+    0 1px 0 rgba(255, 255, 255, 0.90) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.10) inset,
+    0 4px 10px rgba(0, 0, 0, 0.12);
+  --sku-btn-secondary-shadow-active:
+    0 -1px 0 rgba(255, 255, 255, 0.70) inset,
+    0 2px 0 rgba(0, 0, 0, 0.08) inset,
+    0 1px 2px rgba(0, 0, 0, 0.08);
+
+  /* ── Spacing Scale ────────────────────────────────────────── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* backward compat */
+  --spacing-sm: var(--space-2);
+  --spacing-md: var(--space-4);
+  --spacing-lg: var(--space-6);
+
+  /* ── Border Radius Scale ──────────────────────────────────── */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-3xl: 32px;
+  --radius-pill: 9999px;
+
+  /* ── Typography Scale ─────────────────────────────────────── */
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-md: 15px;
+  --text-lg: 16px;
+  --text-xl: 18px;
+  --text-2xl: 20px;
+  --text-3xl: 24px;
+  --text-4xl: 28px;
+  --text-5xl: 36px;
+
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --weight-extrabold: 800;
+
+  /* ── Animation / Motion Tokens ────────────────────────────── */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 350ms;
+  --duration-enter: 400ms;
+
+  --ease-out: cubic-bezier(0.0, 0.0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0.0, 1, 1);
+  --ease-inout: cubic-bezier(0.4, 0.0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-smooth: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+
+  /* ── Z-index Ladder ───────────────────────────────────────── */
+  --z-base: 0;
+  --z-raised: 10;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-overlay: 500;
+  --z-modal: 600;
+  --z-toast: 700;
+  --z-tooltip: 800;
+
+}
+
+/* ── Global Base Styles ───────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--color-bg);
-  color: var(--color-text);
-  font-family: sans-serif;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-family);
+  font-size: var(--text-base);
+  font-weight: var(--weight-normal);
+  line-height: 1.6;
+  color: var(--text-primary);
+  background: var(--bg-page);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ── Custom Scrollbar ─────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--neutral-300);
+  border-radius: var(--radius-pill);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--neutral-400);
+}
+
+/* ── Selection ────────────────────────────────────────────────── */
+::selection {
+  background: var(--orange-bg-light);
+  color: var(--orange-700);
+}
+
+/* ── Focus Ring ───────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--orange-500);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ── #app reset ───────────────────────────────────────────────── */
+#app {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  border: none;
+  text-align: left;
+  display: block;
+  box-sizing: border-box;
 }

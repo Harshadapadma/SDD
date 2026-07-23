@@ -1,139 +1,179 @@
 <template>
   <div class="layout" @click="closePanel">
 
-    <!-- SIDEBAR -->
+    <!-- ── SIDEBAR ──────────────────────────────────────────── -->
     <aside :class="['sidebar', { collapsed: isCollapsed }]">
 
-      <!-- TOGGLE BUTTON -->
-      <button class="hamburger" @click.stop="toggleSidebar">
-        <i class="fas fa-bars"></i>
+      <!-- Hamburger -->
+      <button class="hamburger" @click.stop="toggleSidebar" title="Toggle Sidebar">
+        <i :class="isCollapsed ? 'fas fa-bars' : 'fas fa-bars'"></i>
       </button>
 
-      <!-- BRAND BLOCK -->
+      <!-- Brand -->
       <div class="brand-block">
-        <img :src="logo" alt="Negen Logo" class="brand-logo" />
+        <div class="brand-logo-wrap">
+          <img :src="logo" alt="Negen Logo" class="brand-logo" />
+        </div>
         <template v-if="!isCollapsed">
           <span class="brand-name">Negen SDD</span>
-          <span class="brand-role">Administrator</span>
+          <span class="brand-role">{{ userRoleLabel }}</span>
         </template>
       </div>
 
-      <!-- DIVIDER -->
-      <div class="divider" v-if="!isCollapsed"></div>
+      <div class="nav-divider" v-if="!isCollapsed"></div>
 
-      <!-- NAV -->
+      <!-- Nav -->
       <nav class="nav">
-        <div class="nav-item" :class="{ active: $route.path === '/' }" @click="$router.push('/')">
-          <i class="fas fa-chart-line"></i>
-          <span v-if="!isCollapsed">Dashboard</span>
-        </div>
-        <div class="nav-item" :class="{ active: $route.path === '/records' }" @click="$router.push('/records')">
-          <i class="fas fa-database"></i>
-          <span v-if="!isCollapsed">Records</span>
-        </div>
-        <div class="nav-item" :class="{ active: $route.path === '/users' }" @click="$router.push('/users')">
-          <i class="fas fa-users"></i>
-          <span v-if="!isCollapsed">Users</span>
-        </div>
-        <div class="nav-item" :class="{ active: $route.path === '/requests' }" @click="$router.push('/requests')">
-          <i class="fas fa-clipboard-check"></i>
-          <span v-if="!isCollapsed">Requests</span>
-        </div>
+        <!-- Compliance Officer -->
+        <template v-if="user?.role === 'COMPLIANCE_OFFICER'">
+          <div class="nav-item" :class="{ active: $route.path === '/' }" @click="$router.push('/')" title="Dashboard">
+            <i class="fas fa-chart-line"></i>
+            <span v-if="!isCollapsed" class="nav-label">Dashboard</span>
+          </div>
+          <div class="nav-item" :class="{ active: $route.path === '/records' || $route.path.startsWith('/records/') }" @click="$router.push('/records')" title="Records">
+            <i class="fas fa-database"></i>
+            <span v-if="!isCollapsed" class="nav-label">Records</span>
+          </div>
+          <div class="nav-item" :class="{ active: $route.path === '/requests' }" @click="$router.push('/requests')" title="Requests">
+            <i class="fas fa-clipboard-check"></i>
+            <span v-if="!isCollapsed" class="nav-label">Requests</span>
+          </div>
+          <div class="nav-item" :class="{ active: $route.path === '/clarifications' }" @click="$router.push('/clarifications')" title="Clarifications">
+            <i class="fas fa-comments"></i>
+            <span v-if="!isCollapsed" class="nav-label">Clarifications</span>
+          </div>
+          <div class="nav-item" :class="{ active: $route.path === '/users' }" @click="$router.push('/users')" title="Users">
+            <i class="fas fa-users"></i>
+            <span v-if="!isCollapsed" class="nav-label">Users</span>
+          </div>
+          <div class="nav-item" :class="{ active: $route.path === '/audit-log' }" @click="$router.push('/audit-log')" title="Audit Log">
+            <i class="fas fa-history"></i>
+            <span v-if="!isCollapsed" class="nav-label">Audit Log</span>
+          </div>
+        </template>
+
+        <!-- Admin -->
+        <template v-if="user?.role === 'ADMIN'">
+          <div class="nav-item" :class="{ active: $route.path === '/' || $route.path === '/users' }" @click="$router.push('/')" title="Users">
+            <i class="fas fa-users"></i>
+            <span v-if="!isCollapsed" class="nav-label">Users</span>
+          </div>
+        </template>
       </nav>
 
-      <!-- FOOTER -->
-      <div class="sidebar-footer">
-        <div class="footer-avatar" @click="$router.push('/profile')" title="Go to Profile">{{ userName.charAt(0).toUpperCase() }}</div>
+      <!-- Sidebar Footer (user info + logout) -->
+      <div class="sidebar-footer profile-pill-btn" @click="$router.push('/profile')" role="button" tabindex="0" title="View Profile">
+        <div class="footer-avatar">
+          {{ userName.charAt(0).toUpperCase() }}
+        </div>
         <div class="footer-info" v-if="!isCollapsed">
           <span class="footer-name">{{ userName }}</span>
           <span class="footer-email">{{ userEmail }}</span>
         </div>
-        <button class="logout-btn" v-if="!isCollapsed" @click="logout">
+        <button class="logout-btn" v-if="!isCollapsed" @click.stop="logout" title="Sign Out / Switch Account" aria-label="Sign Out">
           <i class="fas fa-sign-out-alt"></i>
         </button>
       </div>
 
     </aside>
 
-    <!-- MAIN CONTENT -->
+    <!-- ── MAIN CONTENT ──────────────────────────────────────── -->
     <main class="content">
 
       <!-- TOPBAR -->
-      <div class="topbar">
-        <div class="topbar-right">
+      <header class="topbar">
+        <div class="topbar-left">
+          <div class="topbar-breadcrumb">
+            <span class="topbar-page">{{ currentPageLabel }}</span>
+          </div>
+        </div>
 
-          <!-- ─── BELL BUTTON ───────────────────────────────── -->
+        <div class="topbar-right">
+          <!-- Bell + Notification Panel -->
           <div class="bell-wrap" @click.stop>
-            <button class="icon-btn" @click="togglePanel" title="Notifications" :class="{ active: panelOpen }">
-              <i class="fas fa-bell"></i>
+            <button
+              :class="['icon-btn', { active: panelOpen }]"
+              @click="togglePanel"
+              title="Notifications"
+              :aria-label="`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`"
+            >
+              <i :class="['fas', isMuted ? 'fa-bell-slash' : 'fa-bell']" :style="{ color: isMuted ? 'var(--error-500)' : undefined }"></i>
               <span class="badge" v-if="unreadCount > 0">{{ unreadCount > 9 ? '9+' : unreadCount }}</span>
             </button>
 
-            <!-- ─── NOTIFICATION PANEL ─────────────────────── -->
-            <transition name="a-panel">
-              <div class="a-notif-panel" v-if="panelOpen">
-
+            <transition name="panel">
+              <div :class="['notif-panel', { expanded: panelExpanded }]" v-if="panelOpen">
                 <!-- Panel Header -->
-                <div class="a-panel-header">
-                  <span class="a-panel-title admin-title">Notifications</span>
-                  <div class="a-panel-actions">
-                    <!-- Mute toggle -->
-                    <button
-                      class="a-panel-icon-btn"
-                      :title="isMuted ? 'Unmute popups' : 'Mute popups'"
-                      @click="toggleMute"
-                    >
-                      <i :class="['fas', isMuted ? 'fa-bell-slash' : 'fa-bell']" :style="{ color: isMuted ? '#ef4444' : undefined }"></i>
+                <div class="panel-header">
+                  <div class="panel-title">
+                    <i :class="['fas', isMuted ? 'fa-bell-slash' : 'fa-bell']" :style="{ color: isMuted ? 'var(--error-500)' : undefined }"></i>
+                    <span>Notifications</span>
+                    <span class="panel-badge" v-if="unreadCount > 0">{{ unreadCount }}</span>
+                  </div>
+                  <div class="panel-actions">
+                    <button class="panel-icon-btn" :title="isSoundMuted ? 'Unmute sound' : 'Mute sound'" @click="toggleSoundMute">
+                      <i :class="['fas', isSoundMuted ? 'fa-volume-xmark' : 'fa-volume-high']" :style="{ color: isSoundMuted ? 'var(--error-500)' : undefined }"></i>
                     </button>
-                    <!-- Mark all read -->
-                    <button class="a-panel-icon-btn" title="Mark all read" @click="markAllRead" :disabled="unreadCount === 0">
+                    <button class="panel-icon-btn" :title="isMuted ? 'Unmute popups' : 'Mute popups'" @click="toggleMute">
+                      <i :class="['fas', isMuted ? 'fa-bell-slash' : 'fa-bell']" :style="{ color: isMuted ? 'var(--error-500)' : undefined }"></i>
+                    </button>
+                    <button class="panel-icon-btn" title="Mark all read" @click="markAllRead" :disabled="unreadCount === 0">
                       <i class="fas fa-check-double"></i>
                     </button>
-                    <!-- View all -->
-                    <button class="a-panel-icon-btn" title="View all" @click="$router.push('/notifications'); panelOpen = false">
-                      <i class="fas fa-arrow-up-right-from-square"></i>
+                    <button class="panel-icon-btn" :title="panelExpanded ? 'Collapse panel' : 'View notification history'" @click.stop="togglePanelExpand">
+                      <i :class="['fas', panelExpanded ? 'fa-compress' : 'fa-clock-rotate-left']"></i>
                     </button>
                   </div>
                 </div>
 
-                <!-- Muted banner -->
-                <div class="a-muted-banner" v-if="isMuted">
-                  <i class="fas fa-bell-slash"></i> Popups are muted
+                <!-- Muted Banner -->
+                <div class="muted-banner" v-if="isMuted">
+                  <i class="fas fa-bell-slash"></i>
+                  <span>Popup notifications are muted</span>
                 </div>
 
-                <!-- Panel Items -->
-                <div class="a-panel-body">
-                  <div v-if="notifications.filter(n => !n.is_read).length === 0" class="a-panel-empty">
-                    <i class="fas fa-bell-slash"></i>
-                    <p>No unread notifications</p>
+                <!-- Notification Items -->
+                <div class="panel-body">
+                  <div v-if="notifications.length === 0" class="panel-empty">
+                    <div class="panel-empty-icon"><i class="fas fa-inbox"></i></div>
+                    <p>No notifications yet</p>
+                    <small>We'll notify you when something happens</small>
+                  </div>
+                  <div v-else-if="!panelExpanded && notifications.filter(n => !n.is_read).length === 0" class="panel-empty">
+                    <div class="panel-empty-icon"><i class="fas fa-inbox"></i></div>
+                    <p>All caught up!</p>
+                    <small>No unread notifications</small>
                   </div>
 
                   <div
-                    v-for="n in notifications.filter(n => !n.is_read).slice(0, 20)"
+                    v-for="n in (panelExpanded ? notifications : notifications.filter(n => !n.is_read).slice(0, 20))"
                     :key="n.id"
-                    :class="['a-panel-item', n.type.toLowerCase(), { unread: !n.is_read }]"
-                    @click="markRead(n.id)"
+                    :class="['panel-item', n.type.toLowerCase(), { unread: !n.is_read }]"
+                    @click="handleNotificationClick(n)"
                   >
-                    <div class="a-panel-item-icon">
+                    <div :class="['panel-item-icon', n.type.toLowerCase()]">
                       <i :class="['fas', typeIcon(n.type)]"></i>
                     </div>
-                    <div class="a-panel-item-body">
-                      <div class="a-panel-item-header">
-                        <div class="a-panel-item-title">{{ n.title }}</div>
-                        <div class="a-panel-item-time">{{ formatTime(n.created_at) }}</div>
+                    <div class="panel-item-body">
+                      <div class="panel-item-header">
+                        <div class="panel-item-title">{{ n.title }}</div>
+                        <div class="panel-item-time">{{ formatTime(n.created_at) }}</div>
                       </div>
-                      <div class="a-panel-item-msg">{{ n.message }}</div>
+                      <div class="panel-item-msg">{{ n.message }}</div>
                     </div>
-                    <div class="a-panel-unread-dot" v-if="!n.is_read"></div>
+                    <div class="unread-dot" v-if="!n.is_read"></div>
                   </div>
                 </div>
               </div>
             </transition>
           </div>
 
-          <div class="profile-pill" @click="$router.push('/profile')" style="cursor: pointer;" title="Go to Profile">{{ userName.charAt(0).toUpperCase() }}</div>
+          <!-- Profile Pill -->
+          <button class="profile-pill" @click="$router.push('/profile')" title="My Profile">
+            {{ userName.charAt(0).toUpperCase() }}
+          </button>
         </div>
-      </div>
+      </header>
 
       <!-- PAGE CONTENT -->
       <div class="page-body">
@@ -142,22 +182,22 @@
 
     </main>
 
-    <!-- ─── TOAST POPUPS (top-right, below bell) ────────────── -->
+    <!-- ── TOASTS ────────────────────────────────────────────── -->
     <teleport to="body">
-      <div class="a-toast-stack">
+      <div class="toast-stack">
         <div
           v-for="t in toasts"
           :key="t._tid"
-          :class="['a-toast', t.type.toLowerCase(), { leaving: t.leaving }]"
+          :class="['toast', t.type.toLowerCase(), { leaving: t.leaving }]"
         >
-          <div class="a-toast-icon">
+          <div :class="['toast-icon', t.type.toLowerCase()]">
             <i :class="['fas', typeIcon(t.type)]"></i>
           </div>
-          <div class="a-toast-body">
-            <div class="a-toast-title">{{ t.title }}</div>
-            <div class="a-toast-msg">{{ t.message }}</div>
+          <div class="toast-body">
+            <div class="toast-title">{{ t.title }}</div>
+            <div class="toast-msg">{{ t.message }}</div>
           </div>
-          <button class="a-toast-close" @click="dismissToast(t._tid)">
+          <button class="toast-close" @click="dismissToast(t._tid)" aria-label="Dismiss">
             <i class="fas fa-times"></i>
           </button>
         </div>
@@ -169,18 +209,41 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import logo from '../assets/logo.png'
 import { useNotifications } from '../composables/useNotifications'
 import api from '../api/client'
 
 const router = useRouter()
-const isCollapsed = ref(false)
-const panelOpen   = ref(false)
+const route = useRoute()
+const isCollapsed   = ref(false)
+const panelOpen     = ref(false)
+const panelExpanded = ref(false)
 
 const user = ref(JSON.parse(localStorage.getItem('user') || '{}'))
 const userName = computed(() => user.value?.name || 'Admin User')
-const userEmail = computed(() => user.value?.email || 'admin@negen.com')
+const userEmail = computed(() => user.value?.email || '')
+const userRoleLabel = computed(() => {
+  if (user.value?.role === 'ADMIN') return 'Administrator'
+  if (user.value?.role === 'COMPLIANCE_OFFICER') return 'Compliance Officer'
+  return user.value?.role || ''
+})
+
+const currentPageLabel = computed(() => {
+  const map: Record<string, string> = {
+    '/': user.value?.role === 'ADMIN' ? 'Users' : 'Dashboard',
+    '/records': 'Records',
+    '/requests': 'Requests',
+    '/clarifications': 'Clarifications',
+    '/audit-log': 'Audit Log',
+    '/profile': 'Profile',
+    '/notifications': 'Notifications',
+    '/users': 'Users',
+  }
+  const path = route.path
+  if (path.startsWith('/records/')) return 'Record Detail'
+  return map[path] || 'Overview'
+})
 
 async function fetchProfile() {
   try {
@@ -188,24 +251,44 @@ async function fetchProfile() {
     user.value = res.data
     localStorage.setItem('user', JSON.stringify(res.data))
   } catch (e) {
-    console.error("Failed to fetch profile", e)
+    console.error('Failed to fetch profile', e)
   }
 }
 
 const {
-  notifications, unreadCount, isMuted, toasts,
+  notifications, unreadCount, isMuted, isSoundMuted, toasts,
   startPolling, stopPolling,
-  markRead, markAllRead, toggleMute, dismissToast,
-  typeIcon, formatTime,
+  markRead, markAllRead, toggleMute, toggleSoundMute,
+  dismissToast, typeIcon, formatTime,
 } = useNotifications()
 
-const toggleSidebar = () => { isCollapsed.value = !isCollapsed.value }
-const togglePanel   = () => { panelOpen.value = !panelOpen.value }
-const closePanel    = () => { panelOpen.value = false }
+const handleNotificationClick = (n: any) => {
+  markRead(n.id)
+  panelOpen.value = false
+  panelExpanded.value = false
+  if (n.title === 'Clarification Requested' || n.title === 'Clarification Reply') {
+    router.push('/requests')
+  }
+}
 
-const logout = () => {
+const toggleSidebar = () => { isCollapsed.value = !isCollapsed.value }
+const togglePanel   = () => {
+  panelOpen.value = !panelOpen.value
+  if (!panelOpen.value) panelExpanded.value = false
+}
+const closePanel    = () => {
+  panelOpen.value = false
+  panelExpanded.value = false
+}
+const togglePanelExpand = () => {
+  panelExpanded.value = !panelExpanded.value
+}
+
+const logout = async () => {
+  try {
+    await api.post('auth/logout/')
+  } catch (_) {}
   localStorage.removeItem('access')
-  localStorage.removeItem('refresh')
   localStorage.removeItem('user')
   router.push('/login')
 }
@@ -217,170 +300,159 @@ onMounted(() => {
 onUnmounted(stopPolling)
 </script>
 
-
-
 <style scoped>
-/* ─── Layout ───────────────────────────────────────────────── */
+
+/* ═══════════════════════════════════════════════════════════
+   LAYOUT SHELL
+═══════════════════════════════════════════════════════════ */
+
 .layout {
   display: flex;
   height: 100vh;
-  background: #e6f0ec;
-  font-family: system-ui, -apple-system, sans-serif;
-  color: #2f3e2f;
+  background: var(--bg-app);
+  font-family: var(--font-family);
+  color: var(--text-primary);
+  overflow: hidden;
 }
 
-/* ─── Sidebar ───────────────────────────────────────────────── */
-@keyframes sidebarSlideIn {
-  from { opacity: 0; transform: translateX(-24px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes fadeInDown {
-  from { opacity: 0; transform: translateY(-12px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-@keyframes logoFloat {
-  0%, 100% { transform: translateY(0px); }
-  50%       { transform: translateY(-5px); }
-}
-
-@keyframes bellShake {
-  0%, 100% { transform: rotate(0deg); }
-  20%       { transform: rotate(15deg); }
-  40%       { transform: rotate(-12deg); }
-  60%       { transform: rotate(8deg); }
-  80%       { transform: rotate(-5deg); }
-}
-
-@keyframes badgePulse {
-  0%, 100% { transform: scale(1); }
-  50%       { transform: scale(1.25); }
-}
-
-@keyframes navItemIn {
-  from { opacity: 0; transform: translateX(-10px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
+/* ═══════════════════════════════════════════════════════════
+   SIDEBAR  (Darker shade of earthy background)
+═══════════════════════════════════════════════════════════ */
 
 .sidebar {
-  width: 230px;
-  min-width: 230px;
-  margin: 14px;
-  border-radius: 22px;
-  padding: 18px 14px;
+  width: 228px;
+  min-width: 228px;
+  margin: 12px;
+  border-radius: var(--radius-2xl);
+  padding: 16px 12px;
 
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 
-  background: #2f7d65;
-  color: white;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-sm);
+  color: var(--text-primary);
 
-  transition: width 0.35s cubic-bezier(0.4,0,0.2,1),
-              min-width 0.35s cubic-bezier(0.4,0,0.2,1),
-              padding 0.35s cubic-bezier(0.4,0,0.2,1);
+  transition:
+    width var(--duration-slow) var(--ease-inout),
+    min-width var(--duration-slow) var(--ease-inout),
+    padding var(--duration-slow) var(--ease-inout);
   overflow: hidden;
-  animation: sidebarSlideIn 0.45s ease both;
+  flex-shrink: 0;
+
+  animation: slideInLeft var(--duration-enter) var(--ease-spring) both;
 }
 
 .sidebar.collapsed {
-  width: 58px;
-  min-width: 58px;
-  padding: 18px 8px;
+  width: 60px;
+  min-width: 60px;
+  padding: 16px 8px;
   align-items: center;
 }
 
-/* ─── Toggle Button ─────────────────────────────────────────── */
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ── Hamburger (Skeuomorphism — interactive control) ─── */
 .hamburger {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--bg-base);
   border: none;
-  padding: 8px 10px;
-  border-radius: 10px;
+  padding: 9px 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  color: white;
+  color: var(--text-secondary);
   align-self: flex-start;
-  transition: background 0.2s;
+  transition: all var(--duration-base) var(--ease-out);
   flex-shrink: 0;
-  width: 38px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: var(--sku-btn-secondary-shadow);
 }
-
-.sidebar.collapsed .hamburger {
-  align-self: center;
-}
-
+.sidebar.collapsed .hamburger { align-self: auto; }
 .hamburger:hover {
-  background: rgba(255, 255, 255, 0.28);
+  color: var(--orange-accent);
+  box-shadow: var(--sku-btn-secondary-shadow-hover);
+}
+.hamburger:active {
+  box-shadow: var(--sku-btn-secondary-shadow-active);
+  transform: translateY(1px);
 }
 
-/* ─── Brand ─────────────────────────────────────────────────── */
+/* ── Brand Block ─────────────────────────────────────── */
 .brand-block {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 10px 6px 4px;
+  gap: 4px;
+  padding: 12px 4px 4px;
   white-space: nowrap;
   overflow: hidden;
-  animation: fadeIn 0.5s ease 0.15s both;
+  animation: fadeIn 0.4s ease 0.1s both;
+}
+
+.brand-logo-wrap {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-base);
+  box-shadow: var(--neu-inset);
+  flex-shrink: 0;
+  transition: box-shadow var(--duration-base) var(--ease-out);
+}
+.sidebar.collapsed .brand-logo-wrap {
+  width: 36px;
+  height: 36px;
+}
+.brand-logo-wrap:hover {
+  box-shadow: var(--neu-card);
 }
 
 .brand-logo {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
+  width: 44px;
+  height: 44px;
   object-fit: contain;
-  background: #ffffff;
-  padding: 8px;
-  flex-shrink: 0;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.15);
-  animation: logoFloat 3.5s ease-in-out infinite;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.10));
+  transition: transform var(--duration-base) var(--ease-spring);
 }
-
-.sidebar.collapsed .brand-logo {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  padding: 4px;
-}
+.sidebar.collapsed .brand-logo { width: 26px; height: 26px; }
+.brand-logo-wrap:hover .brand-logo { transform: scale(1.06); }
 
 .brand-name {
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  white-space: nowrap;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: var(--orange-accent);
+  letter-spacing: 0.2px;
   text-align: center;
 }
 
 .brand-role {
-  font-size: 13px;
-  opacity: 0.75;
-  font-weight: 500;
-  white-space: nowrap;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-weight: var(--weight-semibold);
   text-align: center;
+  letter-spacing: 0.1px;
 }
 
-/* ─── Divider ───────────────────────────────────────────────── */
-.divider {
+/* ── Divider ─────────────────────────────────────────── */
+.nav-divider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.18);
-  margin: 2px 4px;
+  background: var(--neutral-200);
+  margin: 4px 8px;
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
 }
 
-/* ─── Nav ───────────────────────────────────────────────────── */
+/* ── Nav Items ───────────────────────────────────────── */
 .nav {
   display: flex;
   flex-direction: column;
@@ -392,103 +464,118 @@ onUnmounted(stopPolling)
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  border-radius: 999px;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-pill);
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 14px;
-  font-weight: 500;
-  transition: background 0.2s, color 0.2s, transform 0.15s;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  transition: all var(--duration-base) var(--ease-out);
   white-space: nowrap;
   overflow: hidden;
-  box-sizing: border-box;
   width: 100%;
-  max-width: 100%;
-}
-
-/* staggered entrance for each nav item */
-.nav-item:nth-child(1) { animation: navItemIn 0.4s ease 0.2s both; }
-.nav-item:nth-child(2) { animation: navItemIn 0.4s ease 0.3s both; }
-.nav-item:nth-child(3) { animation: navItemIn 0.4s ease 0.4s both; }
-.nav-item:nth-child(4) { animation: navItemIn 0.4s ease 0.5s both; }
-
-.sidebar.collapsed .nav-item {
-  justify-content: center;
-  padding: 11px 0;
-  width: 38px;
+  box-sizing: border-box;
+  animation: slideInLeft 0.4s var(--ease-out) both;
+  user-select: none;
 }
 
 .nav-item i {
-  width: 18px;
+  width: 16px;
   text-align: center;
   flex-shrink: 0;
-  font-size: 15px;
+  font-size: var(--text-sm);
+  transition: color var(--duration-base);
+}
+
+.nav-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .nav-item:hover {
-  background: rgba(255, 255, 255, 0.15);
-  color: white;
-  transform: translateX(3px);
+  color: var(--orange-accent);
+  background: var(--orange-bg-subtle);
 }
 
 .nav-item.active {
-  background: rgba(255, 255, 255, 0.22);
-  color: white;
+  color: var(--orange-accent);
+  background: var(--orange-bg-light);
+  box-shadow: var(--neu-pressed);
+  font-weight: var(--weight-bold);
 }
 
+.sidebar.collapsed .nav-item {
+  justify-content: center;
+  padding: 10px 0;
+  width: 40px;
+  border-radius: var(--radius-md);
+}
 .sidebar.collapsed .nav-item:hover {
   transform: scale(1.1);
 }
 
-/* ─── Sidebar Footer ────────────────────────────────────────── */
-.sidebar-footer {
+/* ── Sidebar Footer (Profile Pill Button — 3D Skeuomorphic Blend) ── */
+.sidebar-footer.profile-pill-btn {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
+  padding: 6px 8px 6px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-base);
+  border: none;
+  box-shadow: var(--sku-btn-secondary-shadow);
   margin-top: auto;
   overflow: hidden;
   white-space: nowrap;
   box-sizing: border-box;
   width: 100%;
-  max-width: 100%;
-  transition: background 0.2s;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: all var(--duration-base) var(--ease-out);
+  user-select: none;
 }
 
-.sidebar-footer:hover {
-  background: rgba(255, 255, 255, 0.16);
+.sidebar-footer.profile-pill-btn:hover {
+  background: var(--bg-base);
+  box-shadow: var(--sku-btn-secondary-shadow-hover);
 }
 
-.sidebar.collapsed .sidebar-footer {
+.sidebar-footer.profile-pill-btn:active {
+  box-shadow: var(--sku-btn-secondary-shadow-active);
+  transform: translateY(1px);
+}
+
+.sidebar.collapsed .sidebar-footer.profile-pill-btn {
   justify-content: center;
-  padding: 8px;
-  background: transparent;
-  width: 38px;
+  padding: 4px;
+  background: var(--bg-base);
+  box-shadow: var(--sku-btn-secondary-shadow);
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
+}
+
+.sidebar.collapsed .sidebar-footer.profile-pill-btn:hover {
+  box-shadow: var(--sku-btn-secondary-shadow-hover);
+  transform: scale(1.08);
 }
 
 .footer-avatar {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: white;
-  color: #2f7d65;
+  background: var(--orange-gradient);
+  color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  font-size: 13px;
+  font-weight: var(--weight-bold);
+  font-size: var(--text-xs);
   flex-shrink: 0;
-  cursor: pointer;
-  transition: box-shadow 0.2s, transform 0.15s;
-}
-
-.footer-avatar:hover {
-  box-shadow: 0 0 0 3px rgba(255,255,255,0.4);
-  transform: scale(1.08);
+  box-shadow: var(--sku-btn-primary-shadow);
+  transition: all var(--duration-base) var(--ease-out);
 }
 
 .footer-info {
@@ -496,64 +583,112 @@ onUnmounted(stopPolling)
   flex-direction: column;
   flex: 1;
   overflow: hidden;
+  min-width: 0;
+  text-align: left;
 }
-
 .footer-name {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: color var(--duration-base);
 }
-
+.sidebar-footer.profile-pill-btn:hover .footer-name {
+  color: var(--orange-accent);
+}
 .footer-email {
   font-size: 10px;
-  opacity: 0.65;
+  color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .logout-btn {
-  background: none;
+  background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
   cursor: pointer;
-  padding: 4px 6px;
-  border-radius: 8px;
-  transition: background 0.2s;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  transition: all var(--duration-base) var(--ease-out);
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-xs);
 }
-
 .logout-btn:hover {
-  background: rgba(255, 255, 255, 0.18);
-  color: white;
+  color: var(--error-600);
+  background: var(--error-bg);
+  box-shadow: var(--sku-btn-secondary-shadow);
+  transform: scale(1.1);
+}
+.logout-btn:active {
+  transform: scale(0.95);
 }
 
-/* ─── Main Content ──────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════
+   MAIN CONTENT
+═══════════════════════════════════════════════════════════ */
+
 .content {
   flex: 1;
-  margin: 14px 14px 14px 0;
-  padding: 20px 24px;
-  border-radius: 22px;
-  background: #ffffff;
-  overflow-y: auto;
+  margin: 12px 12px 12px 0;
+  border-radius: var(--radius-2xl);
+  background: var(--bg-content);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   min-width: 0;
-  animation: fadeIn 0.4s ease 0.1s both;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.03);
+  animation: fadeIn 0.4s var(--ease-out) 0.1s both;
 }
 
-/* ─── Topbar ────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════
+   TOPBAR  (Same color as content card with 3D tactile controls)
+═══════════════════════════════════════════════════════════ */
+
 .topbar {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  padding: 16px 24px;
+  background: var(--bg-content);
+  border-bottom: none;
   position: relative;
-  z-index: 10;
-  animation: fadeInDown 0.4s ease 0.2s both;
+  z-index: var(--z-sticky);
+  flex-shrink: 0;
+  animation: fadeInDown 0.4s var(--ease-out) 0.15s both;
+}
+
+.topbar-left {}
+
+.topbar-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-sm);
+  padding: 6px 14px;
+  background: var(--bg-content);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-sm);
+}
+.topbar-company {
+  color: var(--text-muted);
+  font-weight: var(--weight-semibold);
+}
+.topbar-sep {
+  color: var(--neutral-300);
+  font-size: 9px;
+}
+.topbar-page {
+  color: var(--text-primary);
+  font-weight: var(--weight-bold);
 }
 
 .topbar-right {
@@ -562,10 +697,10 @@ onUnmounted(stopPolling)
   gap: 10px;
 }
 
-/* ─── Notification Button ───────────────────────────────────── */
+/* ── Icon Button (3D Tactile structure) ───────── */
 .icon-btn {
   position: relative;
-  background: #f1f5f9;
+  background: var(--bg-content);
   border: none;
   width: 38px;
   height: 38px;
@@ -574,391 +709,451 @@ onUnmounted(stopPolling)
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #475569;
-  font-size: 15px;
-  transition: background 0.2s, color 0.2s, transform 0.2s;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--duration-fast) var(--ease-out);
 }
-
 .icon-btn:hover {
-  background: #2f7d65;
-  color: white;
-  transform: scale(1.08);
+  color: var(--orange-accent);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
 }
-
-.icon-btn:hover i {
-  animation: bellShake 0.5s ease;
+.icon-btn:active {
+  box-shadow: var(--shadow-xs);
+  transform: translateY(0);
+}
+.icon-btn.active {
+  color: var(--orange-accent);
+  background: var(--orange-bg-subtle);
+  box-shadow: var(--neu-pressed);
 }
 
 .badge {
   position: absolute;
-  top: 1px;
-  right: 1px;
-  background: #ee6c4d; /* Warm orange — matches user panel */
+  top: 0;
+  right: 0;
+  background: var(--orange-accent);
   color: white;
   font-size: 9px;
-  font-weight: 700;
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
+  font-weight: var(--weight-bold);
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: var(--radius-pill);
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 2px solid var(--bg-base);
   animation: badgePulse 2s ease-in-out infinite;
 }
 
-/* ─── Profile Pill ──────────────────────────────────────────── */
 .profile-pill {
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  background: #2f7d65;
+  background: var(--orange-gradient);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  font-size: 14px;
+  font-weight: var(--weight-bold);
+  font-size: var(--text-sm);
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
+  border: none;
+  box-shadow: var(--sku-btn-primary-shadow);
+  transition: all var(--duration-base) var(--ease-out);
 }
-
 .profile-pill:hover {
-  transform: scale(1.1);
-  box-shadow: 0 0 0 3px rgba(47,125,101,0.3);
+  box-shadow: var(--sku-btn-primary-shadow-hover);
+  transform: translateY(-1px);
+}
+.profile-pill:active {
+  box-shadow: var(--sku-btn-primary-shadow-active);
+  transform: translateY(0);
 }
 
-/* ─── Page content area ─────────────────────────────────────── */
-.page-body {
-  flex: 1;
-  overflow-y: auto;
-  animation: fadeInUp 0.4s ease 0.3s both;
-}
+/* ═══════════════════════════════════════════════════════════
+   NOTIFICATION PANEL  (Glassmorphism — elevated layer)
+═══════════════════════════════════════════════════════════ */
 
-/* ─── Notification Panel ────────────────────────────────────── */
-.bell-wrap {
-  position: relative;
-}
+.bell-wrap { position: relative; }
 
-.icon-btn.active {
-  background: #2f7d65;
-  color: white;
-}
-
-.a-notif-panel {
-  --a-accent: 47, 125, 101;
+.notif-panel {
   position: absolute;
-  top: calc(100% + 12px);
+  top: calc(100% + 10px);
   right: 0;
   width: 360px;
-  border-radius: 20px;
-  background: linear-gradient(rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.92)), rgba(var(--a-accent), 0.4);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(var(--a-accent), 0.2);
-  box-shadow: 
-    0 8px 32px rgba(var(--a-accent), 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.5),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.1),
-    inset 0 0 12px 6px rgba(var(--a-accent), 0.15);
-  z-index: 50;
+  border-radius: var(--radius-xl);
+  background: var(--bg-base);
+  border: none;
+  box-shadow: var(--neu-card-hover);
+  z-index: var(--z-dropdown);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   transform-origin: top right;
-  color: #1e293b;
+  color: var(--text-primary);
+  transition: width var(--duration-slow) var(--ease-spring), max-height var(--duration-slow) var(--ease-spring), box-shadow var(--duration-base);
 }
 
-.a-panel-enter-active, .a-panel-leave-active {
-  transition: opacity 0.2s, transform 0.2s;
-}
-.a-panel-enter-from, .a-panel-leave-to {
-  opacity: 0;
-  transform: scale(0.96) translateY(-4px);
+.notif-panel.expanded {
+  width: min(600px, calc(100vw - 40px));
+  max-height: calc(80vh - 16px);
+  height: calc(80vh - 16px);
+  box-shadow: 0 28px 70px -12px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
-.a-panel-header {
-  padding: 14px 18px;
-  background: rgba(var(--a-accent), 0.08);
-  border-bottom: 1px solid rgba(var(--a-accent), 0.15);
+/* Panel transition */
+.panel-enter-active {
+  animation: panelOpen 0.2s var(--ease-spring) both;
+}
+.panel-leave-active {
+  animation: panelClose 0.15s var(--ease-in) forwards;
+}
+@keyframes panelOpen {
+  from { opacity: 0; transform: scale(0.95) translateY(-6px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes panelClose {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.95) translateY(-6px); }
+}
+
+.panel-header {
+  padding: 14px 16px;
+  background: var(--bg-app);
+  border-bottom: 1px solid var(--card-divider);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
-.a-panel-title { font-weight: 700; font-size: 14px; color: #1e293b; }
-.admin-title { color: #2f7d65; }
-
-.a-panel-actions {
-  display: flex;
-  gap: 4px;
-}
-
-.a-panel-icon-btn {
-  background: none;
-  border: none;
-  padding: 6px;
-  border-radius: 8px;
-  cursor: pointer;
-  color: #2f7d65;
-  transition: all 0.2s;
-}
-.a-panel-icon-btn:hover {
-  background: rgba(47,125,101,0.12);
-}
-.a-panel-icon-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-.a-muted-banner {
-  background: rgba(254, 226, 226, 0.8);
-  color: #ef4444;
-  padding: 8px 16px;
-  font-size: 12px;
-  font-weight: 600;
+.panel-title {
   display: flex;
   align-items: center;
   gap: 8px;
-  border-bottom: 1px solid rgba(239, 68, 68, 0.2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+}
+.panel-title i { color: var(--orange-accent); font-size: var(--text-base); }
+
+.panel-badge {
+  background: var(--orange-accent);
+  color: white;
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
 }
 
-.a-panel-body {
-  max-height: 400px;
+.panel-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.panel-icon-btn {
+  background: var(--bg-base);
+  border: none;
+  box-shadow: var(--sku-btn-secondary-shadow);
+  padding: 5px 7px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  transition: all var(--duration-fast);
+  line-height: 1;
+}
+.panel-icon-btn:hover {
+  background: var(--bg-app);
+  color: var(--orange-accent);
+  box-shadow: var(--sku-btn-secondary-shadow-hover);
+}
+.panel-icon-btn:active { transform: scale(0.94); }
+.panel-icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.muted-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--warning-bg);
+  color: var(--warning-700);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  border-bottom: 1px solid var(--warning-border);
+}
+
+.panel-body {
+  max-height: 380px;
+  overflow-y: auto;
+  padding: 8px 10px;
+  margin: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  transition: max-height var(--duration-slow) var(--ease-spring);
+}
+
+.notif-panel.expanded .panel-body {
+  max-height: calc(80vh - 110px);
+  height: calc(80vh - 110px);
   overflow-y: auto;
 }
-.a-panel-empty {
-  padding: 40px;
+
+.panel-empty {
+  padding: 24px 16px;
   text-align: center;
-  color: #64748b;
-}
-.a-panel-empty i {
-  font-size: 32px;
-  margin-bottom: 10px;
-}
-
-.a-panel-item {
+  color: var(--text-muted);
   display: flex;
-  margin: 6px 10px;
-  padding: 10px 14px;
-  gap: 10px;
+  flex-direction: column;
   align-items: center;
+  gap: 6px;
+  background: transparent;
+}
+.panel-empty-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-lg);
+  background: var(--neutral-100);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: var(--neutral-400);
+  margin-bottom: 4px;
+}
+.panel-empty p {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-secondary);
+}
+.panel-empty small { font-size: var(--text-xs); }
+
+.panel-item {
+  display: flex;
+  margin: 0 0 8px 0;
+  padding: 10px 12px;
+  gap: 12px;
+  align-items: flex-start;
   cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-  overflow: hidden;
-
-  background: rgba(255, 255, 255, 0.65);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border-radius: 20px;
-  border: 1px solid rgba(var(--a-accent), 0.15);
-  box-shadow: 
-    0 4px 16px rgba(var(--a-accent), 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 0.5),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-lg);
+  background: var(--bg-base);
+  box-shadow: var(--sku-btn-secondary-shadow);
+  border: none;
+  transition: all var(--duration-fast) var(--ease-out);
+  user-select: none;
 }
-
-.a-panel-item::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0; height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
+.panel-item:last-child {
+  margin-bottom: 0;
 }
-
-.a-panel-item::after {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; width: 1px; height: 100%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.8), transparent, rgba(255, 255, 255, 0.3));
-}
-
-.a-panel-item:hover {
-  background: rgba(255, 255, 255, 0.85);
+.panel-item:hover {
+  box-shadow: var(--sku-btn-secondary-shadow-hover);
   transform: translateY(-1px);
-  box-shadow: 
-    0 8px 24px rgba(var(--a-accent), 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.6),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.1);
+}
+.panel-item:active {
+  box-shadow: var(--sku-btn-secondary-shadow-active);
+  transform: translateY(1px);
+}
+.panel-item.unread {
+  border: none !important;
 }
 
-.a-panel-item.unread {
-  background: rgba(255, 255, 255, 0.90);
-}
-
-.a-panel-item.info { background: rgba(59, 130, 246, 0.10); }
-.a-panel-item.success { background: rgba(34, 197, 94, 0.10); }
-.a-panel-item.warning { background: rgba(245, 158, 11, 0.10); }
-.a-panel-item.error { background: rgba(239, 68, 68, 0.10); }
-
-.a-panel-item-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
+.panel-item-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   font-size: 14px;
+  background: var(--bg-base);
+  box-shadow: var(--sku-btn-secondary-shadow);
+  color: var(--text-primary);
 }
-.a-panel-item.info .a-panel-item-icon { background: #e0f2fe; color: #0284c7; }
-.a-panel-item.success .a-panel-item-icon { background: #dcfce7; color: #15803d; }
-.a-panel-item.warning .a-panel-item-icon { background: #fef3cd; color: #b45309; }
-.a-panel-item.error .a-panel-item-icon { background: #fee2e2; color: #b91c1c; }
 
-.a-panel-item-body {
-  flex: 1;
-  min-width: 0;
-}
-.a-panel-item-header {
+.panel-item-body { flex: 1; min-width: 0; }
+.panel-item-header {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
+  gap: 4px;
   margin-bottom: 2px;
 }
-.a-panel-item-title {
-  font-size: 12.5px;
-  font-weight: 700;
-  color: #1e293b;
+.panel-item-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  letter-spacing: -0.01em;
+  transition: color var(--duration-fast);
 }
-.a-panel-item-msg {
-  font-size: 12px;
-  color: #475569;
-  line-height: 1.4;
-  margin-bottom: 4px;
-}
-.a-panel-item-time {
+.panel-item:hover .panel-item-title { color: var(--orange-accent); }
+.panel-item-time {
   font-size: 10px;
-  color: #64748b;
-  font-weight: 500;
+  color: var(--text-muted);
   white-space: nowrap;
-  opacity: 0.8;
-}
-
-.a-panel-unread-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: rgba(var(--a-accent), 1);
-  box-shadow: 0 0 6px rgba(var(--a-accent), 0.6);
   flex-shrink: 0;
 }
+.panel-item-msg {
+  font-size: 12px;
+  color: rgba(55, 65, 81, 0.88);
+  line-height: 1.4;
+}
 
-/* ─── Toasts ────────────────────────────────────────────────── */
-.a-toast-stack {
+.unread-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--orange-accent);
+  flex-shrink: 0;
+  margin-top: 4px;
+  box-shadow: 0 0 8px var(--orange-glow);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PAGE BODY
+═══════════════════════════════════════════════════════════ */
+
+.page-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px;
+  animation: fadeInUp 0.4s var(--ease-out) 0.2s both;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TOASTS  (Liquid Glass iOS by Apple)
+═══════════════════════════════════════════════════════════ */
+
+.toast-stack {
   position: fixed;
   top: 70px;
-  right: 24px;
-  z-index: 100;
+  right: 20px;
+  z-index: var(--z-toast);
   display: flex;
   flex-direction: column;
   gap: 12px;
   pointer-events: none;
 }
 
-.a-toast {
+.toast,
+.toast.success,
+.toast.info,
+.toast.warning,
+.toast.error {
   pointer-events: auto;
   width: 340px;
-  border-radius: 20px;
-  padding: 12px 16px;
+  border-radius: var(--radius-2xl);
+  padding: 14px 16px;
   display: flex;
   gap: 12px;
-  align-items: center;
+  align-items: flex-start;
+  background: var(--bg-base);
+  border: none !important;
+  box-shadow: var(--neu-card-hover);
+  transition: all var(--duration-base) var(--ease-out);
+  animation: toastIn 0.4s var(--ease-spring) both;
   position: relative;
   overflow: hidden;
-  backdrop-filter: blur(24px) saturate(150%);
-  -webkit-backdrop-filter: blur(24px) saturate(150%);
-  transition: all 0.2s ease;
-  animation: atoastIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
 }
 
-.a-toast::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0; height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
-}
+.toast.leaving { animation: toastOut 0.4s var(--ease-in) forwards; }
 
-.a-toast::after {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; width: 1px; height: 100%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.8), transparent, rgba(255, 255, 255, 0.3));
-}
-
-.a-toast.leaving {
-  animation: atoastOut 0.5s ease-in forwards;
-}
-
-.a-toast.info { --a-t-accent: 234, 179, 8; }
-.a-toast.success { --a-t-accent: 34, 197, 94; }
-.a-toast.warning { --a-t-accent: 245, 158, 11; }
-.a-toast.error { --a-t-accent: 239, 68, 68; }
-
-.a-toast {
-  background: rgba(255, 255, 255, 0.4);
-  border: 1px solid rgba(var(--a-t-accent), 0.25);
-  box-shadow: 
-    0 12px 40px rgba(var(--a-t-accent), 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.6),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.15),
-    inset 0 0 14px 7px rgba(var(--a-t-accent), 0.15);
-}
-
-.a-toast-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
+.toast-icon,
+.toast-icon.success,
+.toast-icon.info,
+.toast-icon.warning,
+.toast-icon.error {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  font-size: 14px;
-}
-.a-toast.info .a-toast-icon { background: #fef9c3; color: #a16207; }
-.a-toast.success .a-toast-icon { background: #dcfce7; color: #15803d; }
-.a-toast.warning .a-toast-icon { background: #fef3cd; color: #b45309; }
-.a-toast.error .a-toast-icon { background: #fee2e2; color: #b91c1c; }
-
-.a-toast-body {
-  flex: 1;
-}
-.a-toast-title {
-  font-size: 12.5px;
-  font-weight: 700;
-  margin-bottom: 2px;
-  color: #1e293b;
-}
-.a-toast-msg {
-  font-size: 12px;
-  color: #475569;
-  line-height: 1.4;
+  font-size: var(--text-base);
+  background: var(--bg-app);
+  box-shadow: var(--neu-inset);
+  margin-left: 2px;
+  color: var(--text-primary);
+  border: none !important;
 }
 
-.a-toast-close {
-  background: none;
+.toast-body { flex: 1; min-width: 0; padding-top: 1px; }
+.toast-title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-extrabold);
+  color: var(--text-primary);
+  margin-bottom: 3px;
+  letter-spacing: -0.01em;
+}
+.toast-msg {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: 1.45;
+  font-weight: var(--weight-medium);
+}
+
+.toast-close {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--bg-base);
+  box-shadow: var(--sku-btn-secondary-shadow);
   border: none;
   cursor: pointer;
-  color: #64748b;
-  font-size: 14px;
-  padding: 4px;
-  border-radius: 6px;
-  transition: background 0.2s, color 0.2s;
+  color: var(--text-muted);
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--duration-fast);
+  flex-shrink: 0;
 }
-.a-toast-close:hover {
-  background: rgba(0, 0, 0, 0.05);
-  color: #1e293b;
-}
-
-@keyframes atoastIn {
-  0% { transform: translateX(100%); opacity: 0; }
-  100% { transform: translateX(0); opacity: 1; }
+.toast-close:hover {
+  background: var(--bg-app);
+  color: var(--orange-accent);
+  box-shadow: var(--sku-btn-secondary-shadow-hover);
 }
 
-@keyframes atoastOut {
-  0% { transform: scale(1) translateY(0); opacity: 1; }
-  100% { transform: scale(0.5) translate(30px, -60px); opacity: 0; } /* flies slightly up toward bell */
+/* ═══════════════════════════════════════════════════════════
+   ANIMATIONS
+═══════════════════════════════════════════════════════════ */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes badgePulse {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.2); }
+}
+@keyframes toastIn {
+  from { transform: translateX(110%); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+@keyframes toastOut {
+  from { transform: scale(1); opacity: 1; }
+  to   { transform: scale(0.85) translateX(60px); opacity: 0; }
+}
+
 </style>

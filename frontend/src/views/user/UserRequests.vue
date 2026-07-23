@@ -5,118 +5,99 @@
     <div class="page-header">
       <div>
         <h1 class="page-title">My Requests</h1>
-        <p class="page-sub">Track the status of your system and record requests</p>
+        <p class="page-sub">Track real-time status of your submitted system and record requests</p>
       </div>
     </div>
 
     <!-- LOADING -->
     <div v-if="loading" class="loading-state">
-      <i class="fas fa-spinner fa-spin"></i> Loading requests...
+      <i class="fas fa-spinner fa-spin"></i> Fetching your requests...
     </div>
 
-    <!-- KANBAN BOARD -->
-    <div v-else class="kanban-board">
-
-      <!-- PENDING COLUMN -->
-      <div class="kanban-col">
-        <div class="col-header pending">
-          <div class="col-title">
-            <i class="fas fa-clock"></i>
-            <span>Pending</span>
-          </div>
-          <span class="col-count">{{ pendingRequests.length }}</span>
-        </div>
-        <div class="col-body">
-          <div v-if="pendingRequests.length === 0" class="col-empty">
-            <i class="fas fa-check-circle"></i>
-            <span>No pending requests</span>
-          </div>
-          <div v-for="req in pendingRequests" :key="req._key" class="kanban-card">
-            <div class="card-top">
-              <span :class="['type-chip', req._type]">{{ req._typeLabel }}</span>
-              <span class="card-id">#{{ req.id }}</span>
-            </div>
-            <div class="card-target" v-if="req._type !== 'role'">
-              <i class="fas fa-file-alt"></i> Record {{ req.record_id }}
-            </div>
-            <div class="card-target" v-else>
-              <i class="fas fa-user-tag"></i> {{ req.requested_role }}
-            </div>
-            <div class="card-target" v-if="req._type === 'access'">
-              <i class="fas fa-key"></i> {{ req.requested_access }}
-            </div>
-            <div class="card-date">
-              <i class="fas fa-calendar-alt"></i> {{ formatDate(req.created_at) }}
-            </div>
-          </div>
-        </div>
+    <template v-else>
+      <!-- TAB TOGGLE -->
+      <div class="tab-bar">
+        <button
+          v-for="tab in tabs"
+          :key="tab.key"
+          :class="['tab-btn', { active: activeTab === tab.key }]"
+          :data-tab="tab.key"
+          @click="activeTab = tab.key"
+        >
+          <i :class="tab.icon"></i>
+          <span>{{ tab.label }}</span>
+          <span class="tab-count" :class="tab.key">{{ tab.count }}</span>
+        </button>
       </div>
 
-      <!-- APPROVED COLUMN -->
-      <div class="kanban-col">
-        <div class="col-header approved">
-          <div class="col-title">
-            <i class="fas fa-check-circle"></i>
-            <span>Approved</span>
-          </div>
-          <span class="col-count">{{ approvedRequests.length }}</span>
-        </div>
-        <div class="col-body">
-          <div v-if="approvedRequests.length === 0" class="col-empty">
-            <i class="fas fa-inbox"></i>
-            <span>No approved requests</span>
-          </div>
-          <div v-for="req in approvedRequests" :key="req._key" class="kanban-card approved">
-            <div class="card-top">
-              <span :class="['type-chip', req._type]">{{ req._typeLabel }}</span>
-              <span class="card-id">#{{ req.id }}</span>
-            </div>
-            <div class="card-target" v-if="req._type !== 'role'">
-              <i class="fas fa-file-alt"></i> Record {{ req.record_id }}
-            </div>
-            <div class="card-target" v-else>
-              <i class="fas fa-user-tag"></i> {{ req.requested_role }}
-            </div>
-            <div class="card-date">
-              <i class="fas fa-calendar-alt"></i> {{ formatDate(req.created_at) }}
-            </div>
-          </div>
-        </div>
-      </div>
+      <!-- REQUEST LIST -->
+      <div class="request-list">
+        <transition name="fade-slide" mode="out-in">
 
-      <!-- REJECTED COLUMN -->
-      <div class="kanban-col">
-        <div class="col-header rejected">
-          <div class="col-title">
-            <i class="fas fa-times-circle"></i>
-            <span>Rejected</span>
+          <!-- EMPTY STATE -->
+          <div class="empty-state" v-if="activeList.length === 0" :key="'empty-' + activeTab">
+            <div class="empty-icon-wrap" :class="activeTab">
+              <i :class="['fas', activeTab === 'pending' ? 'fa-hourglass-half' : activeTab === 'approved' ? 'fa-circle-check' : 'fa-circle-xmark']"></i>
+            </div>
+            <p class="empty-title">No {{ activeTab }} requests</p>
+            <p class="empty-sub">You don't have any {{ activeTab }} requests at the moment.</p>
           </div>
-          <span class="col-count">{{ rejectedRequests.length }}</span>
-        </div>
-        <div class="col-body">
-          <div v-if="rejectedRequests.length === 0" class="col-empty">
-            <i class="fas fa-inbox"></i>
-            <span>No rejected requests</span>
-          </div>
-          <div v-for="req in rejectedRequests" :key="req._key" class="kanban-card rejected">
-            <div class="card-top">
-              <span :class="['type-chip', req._type]">{{ req._typeLabel }}</span>
-              <span class="card-id">#{{ req.id }}</span>
-            </div>
-            <div class="card-target" v-if="req._type !== 'role'">
-              <i class="fas fa-file-alt"></i> Record {{ req.record_id }}
-            </div>
-            <div class="card-target" v-else>
-              <i class="fas fa-user-tag"></i> {{ req.requested_role }}
-            </div>
-            <div class="card-date">
-              <i class="fas fa-calendar-alt"></i> {{ formatDate(req.created_at) }}
-            </div>
-          </div>
-        </div>
-      </div>
 
-    </div>
+          <!-- LIST ROWS (Neomorphism) -->
+          <div class="list-container" v-else :key="'list-' + activeTab">
+            <div
+              v-for="(req, i) in activeList"
+              :key="req._key"
+              class="list-row"
+              :style="{ animationDelay: i * 50 + 'ms' }"
+            >
+              <!-- Type Icon -->
+              <div class="row-icon" :class="req._type">
+                <i :class="typeIcon(req._type)"></i>
+              </div>
+
+              <!-- Main Info -->
+              <div class="row-info">
+                <div class="row-main">
+                  <span class="row-label">
+                    <template v-if="req._type !== 'role'">
+                      {{ req.record_id || req.record_name || '—' }}
+                    </template>
+                    <template v-else>
+                      Requested to change role to {{ req.requested_role ? req.requested_role.toLowerCase() : 'viewer' }}
+                    </template>
+                  </span>
+                  <span class="row-sub" v-if="req._type === 'access'">
+                    Requesting <strong>{{ req.requested_access }}</strong> access
+                  </span>
+                  <span class="row-sub" v-else-if="req._type === 'role'">
+                    System role modification request
+                  </span>
+                  <span class="row-sub" v-else>
+                    {{ req._typeLabel }} request
+                  </span>
+                </div>
+              </div>
+
+              <!-- Type Chip -->
+              <span :class="['type-chip', req._type]">
+                {{ req._typeLabel }}
+              </span>
+
+              <!-- Date -->
+              <div class="row-date">
+                <i class="fas fa-clock"></i>
+                <span>{{ formatDate(req.created_at) }}</span>
+              </div>
+
+              <!-- ID -->
+              <span class="row-id">#{{ req.id }}</span>
+            </div>
+          </div>
+
+        </transition>
+      </div>
+    </template>
 
   </div>
 </template>
@@ -126,10 +107,14 @@ import { ref, onMounted, computed } from 'vue'
 import api from '../../api/client'
 
 const loading = ref(true)
+const activeTab = ref<'pending' | 'approved' | 'rejected'>('pending')
+
 const data = ref<any>({
   delete_requests: [],
   role_requests: [],
-  access_requests: []
+  access_requests: [],
+  creation_requests: [],
+  edit_requests: []
 })
 
 async function fetchRequests() {
@@ -145,15 +130,41 @@ async function fetchRequests() {
 }
 
 const allRequests = computed(() => {
-  const del = (data.value.delete_requests || []).map((r: any) => ({ ...r, _type: 'delete', _typeLabel: 'Deletion', _key: 'del-' + r.id }))
-  const role = (data.value.role_requests || []).map((r: any) => ({ ...r, _type: 'role', _typeLabel: 'Role Change', _key: 'role-' + r.id }))
-  const acc = (data.value.access_requests || []).map((r: any) => ({ ...r, _type: 'access', _typeLabel: 'Access', _key: 'acc-' + r.id }))
-  return [...del, ...role, ...acc].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  const del      = (data.value.delete_requests   || []).map((r: any) => ({ ...r, _type: 'delete',   _typeLabel: 'Deletion',    _key: 'del-'    + r.id }))
+  const role     = (data.value.role_requests     || []).map((r: any) => ({ ...r, _type: 'role',     _typeLabel: 'Role Change', _key: 'role-'   + r.id }))
+  const acc      = (data.value.access_requests   || []).map((r: any) => ({ ...r, _type: 'access',   _typeLabel: 'Access',      _key: 'acc-'    + r.id }))
+  const creation = (data.value.creation_requests || []).map((r: any) => ({ ...r, _type: 'creation', _typeLabel: 'Creation',    _key: 'create-' + r.id }))
+  const edit     = (data.value.edit_requests     || []).map((r: any) => ({ ...r, _type: 'edit',     _typeLabel: 'Edit',        _key: 'edit-'   + r.id }))
+  return [...del, ...role, ...acc, ...creation, ...edit]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 })
 
-const pendingRequests = computed(() => allRequests.value.filter(r => r.status === 'PENDING'))
+const pendingRequests  = computed(() => allRequests.value.filter(r => r.status === 'PENDING'))
 const approvedRequests = computed(() => allRequests.value.filter(r => r.status === 'APPROVED'))
 const rejectedRequests = computed(() => allRequests.value.filter(r => r.status === 'REJECTED'))
+
+const activeList = computed(() => {
+  if (activeTab.value === 'pending')  return pendingRequests.value
+  if (activeTab.value === 'approved') return approvedRequests.value
+  return rejectedRequests.value
+})
+
+const tabs = computed<{ key: 'pending' | 'approved' | 'rejected', label: string, icon: string, count: number }[]>(() => [
+  { key: 'pending',  label: 'Pending',  icon: 'fas fa-hourglass-half', count: pendingRequests.value.length  },
+  { key: 'approved', label: 'Approved', icon: 'fas fa-circle-check',   count: approvedRequests.value.length },
+  { key: 'rejected', label: 'Rejected', icon: 'fas fa-circle-xmark',   count: rejectedRequests.value.length },
+])
+
+function typeIcon(type: string) {
+  const map: Record<string, string> = {
+    creation: 'fas fa-plus-circle',
+    delete:   'fas fa-trash-alt',
+    edit:     'fas fa-pen-to-square',
+    access:   'fas fa-key',
+    role:     'fas fa-user-shield',
+  }
+  return map[type] || 'fas fa-circle'
+}
 
 function formatDate(d: string) {
   if (!d) return '—'
@@ -164,119 +175,129 @@ onMounted(fetchRequests)
 </script>
 
 <style scoped>
-.page { display: flex; flex-direction: column; gap: 24px; animation: fadeIn 0.4s ease both; }
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(14px); }
-  to   { opacity: 1; transform: translateY(0); }
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
 .page-header { display: flex; justify-content: space-between; align-items: flex-start; }
-.page-title { font-size: 24px; font-weight: 800; color: #1e293b; margin: 0; }
-.page-sub { font-size: 14px; color: #64748b; margin-top: 4px; }
+.page-title  { font-size: var(--text-2xl); font-weight: var(--weight-extrabold); color: var(--text-primary); }
+.page-sub    { font-size: var(--text-xs); color: var(--text-secondary); margin-top: 4px; }
 
-/* ─── Loading ────────────────────────────────────────────────── */
 .loading-state {
   display: flex; align-items: center; justify-content: center;
-  padding: 80px 20px; color: #3d5a80; gap: 12px; font-size: 15px;
+  padding: 48px 24px; color: var(--orange-accent); gap: 10px;
+  font-size: var(--text-sm); font-weight: var(--weight-bold);
 }
 
-/* ─── Kanban Board ───────────────────────────────────────────── */
-.kanban-board {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
-  min-height: 400px; animation: fadeInUp 0.4s ease 0.1s both;
+/* Tab Bar */
+.tab-bar {
+  display: flex; gap: 6px;
+  background: var(--bg-app); border-radius: var(--radius-xl);
+  padding: 4px; width: fit-content; box-shadow: var(--neu-inset);
 }
 
-.kanban-col {
-  background: rgba(61, 90, 128, 0.03); border-radius: 20px;
-  border: 1px solid rgba(61, 90, 128, 0.08);
-  display: flex; flex-direction: column; min-height: 300px;
+.tab-btn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px; border: none; border-radius: var(--radius-lg);
+  font-size: var(--text-xs); font-weight: var(--weight-bold); color: var(--text-secondary);
+  background: transparent; cursor: pointer; transition: all var(--duration-fast);
+}
+.tab-btn:hover { color: var(--text-primary); }
+.tab-btn.active { background: var(--bg-base); box-shadow: var(--sku-btn-secondary-shadow); color: var(--text-primary); }
+.tab-btn.active[data-tab="pending"]  { color: var(--warning-700); }
+.tab-btn.active[data-tab="approved"] { color: var(--success-700); }
+.tab-btn.active[data-tab="rejected"] { color: var(--error-700); }
+
+.tab-count {
+  min-width: 20px; height: 20px; border-radius: var(--radius-pill); font-size: 10px; font-weight: var(--weight-bold);
+  display: inline-flex; align-items: center; justify-content: center; padding: 0 6px;
+}
+.tab-count.pending  { background: var(--warning-bg); color: var(--warning-700); }
+.tab-count.approved { background: var(--success-bg); color: var(--success-700); }
+.tab-count.rejected { background: var(--error-bg);   color: var(--error-700); }
+
+.empty-state {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 64px 24px; gap: 10px; text-align: center;
+}
+.empty-icon-wrap {
+  width: 56px; height: 56px; border-radius: var(--radius-xl);
+  display: flex; align-items: center; justify-content: center; font-size: 24px;
+}
+.empty-icon-wrap.pending  { background: var(--warning-bg); color: var(--warning-600); }
+.empty-icon-wrap.approved { background: var(--success-bg); color: var(--success-600); }
+.empty-icon-wrap.rejected { background: var(--error-bg);   color: var(--error-600); }
+
+.empty-title { font-size: var(--text-base); font-weight: var(--weight-bold); color: var(--text-primary); margin: 0; }
+.empty-sub   { font-size: var(--text-xs); color: var(--text-secondary); margin: 0; max-width: 280px; }
+
+/* List Container (Neomorphism) */
+.list-container {
+  background: var(--bg-base);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--neu-card);
   overflow: hidden;
 }
 
-/* Column Headers */
-.col-header {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 16px 20px; border-bottom: 1px solid rgba(61, 90, 128, 0.08);
+.list-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--card-divider);
+  transition: background var(--duration-fast);
 }
-.col-header.pending { background: linear-gradient(135deg, #fffbeb, #fef3c7); }
-.col-header.approved { background: linear-gradient(135deg, #f0fdf4, #dcfce7); }
-.col-header.rejected { background: linear-gradient(135deg, #fef2f2, #fee2e2); }
+.list-row:last-child { border-bottom: none; }
+.list-row:hover { background: rgba(234, 108, 0, 0.06); }
 
-.col-title {
-  display: flex; align-items: center; gap: 10px;
-  font-size: 14px; font-weight: 700;
+.row-icon {
+  width: 40px; height: 40px; border-radius: var(--radius-lg);
+  display: flex; align-items: center; justify-content: center;
+  font-size: var(--text-base); flex-shrink: 0;
 }
-.col-header.pending .col-title { color: #92400e; }
-.col-header.approved .col-title { color: #166534; }
-.col-header.rejected .col-title { color: #991b1b; }
+.row-icon.creation { background: var(--info-bg);    color: var(--info-600); }
+.row-icon.delete   { background: var(--error-bg);   color: var(--error-600); }
+.row-icon.edit     { background: var(--warning-bg); color: var(--warning-600); }
+.row-icon.access   { background: var(--success-bg); color: var(--success-600); }
+.row-icon.role     { background: var(--orange-bg-subtle); color: var(--orange-accent); }
 
-.col-count {
-  background: rgba(0,0,0,0.08); padding: 2px 10px; border-radius: 999px;
-  font-size: 12px; font-weight: 800;
+.row-info { flex: 1; min-width: 0; }
+.row-main { display: flex; flex-direction: column; gap: 2px; }
+.row-label {
+  font-size: var(--text-sm); font-weight: var(--weight-bold); color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.col-header.pending .col-count { background: rgba(180, 83, 9, 0.15); color: #92400e; }
-.col-header.approved .col-count { background: rgba(22, 101, 52, 0.15); color: #166534; }
-.col-header.rejected .col-count { background: rgba(153, 27, 27, 0.15); color: #991b1b; }
-
-/* Column Body */
-.col-body {
-  padding: 16px; display: flex; flex-direction: column; gap: 12px;
-  flex: 1; overflow-y: auto;
-}
-
-.col-empty {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  flex: 1; color: #94a3b8; gap: 10px; font-size: 13px; font-weight: 500;
-  min-height: 150px;
-}
-.col-empty i { font-size: 28px; opacity: 0.4; }
-
-/* ─── Kanban Cards ───────────────────────────────────────────── */
-.kanban-card {
-  background: white; border-radius: 14px; padding: 16px;
-  border: 1px solid rgba(61, 90, 128, 0.1);
-  box-shadow: 0 2px 8px rgba(61, 90, 128, 0.04);
-  display: flex; flex-direction: column; gap: 10px;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  animation: fadeInUp 0.3s ease both;
-}
-.kanban-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(61, 90, 128, 0.08);
-}
-.kanban-card.approved { border-left: 3px solid #22c55e; }
-.kanban-card.rejected { border-left: 3px solid #ef4444; }
-
-.card-top {
-  display: flex; justify-content: space-between; align-items: center;
-}
-.card-id {
-  font-family: monospace; font-size: 12px; font-weight: 700; color: #94a3b8;
-}
+.row-sub { font-size: var(--text-xs); color: var(--text-secondary); }
+.row-sub strong { color: var(--text-primary); font-weight: var(--weight-bold); }
 
 .type-chip {
-  padding: 3px 10px; border-radius: 6px; font-size: 10px;
-  font-weight: 800; text-transform: uppercase; letter-spacing: 0.3px;
+  padding: 3px 8px; border-radius: var(--radius-xs); font-size: 10px; font-weight: var(--weight-bold);
+  text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; flex-shrink: 0;
 }
-.type-chip.delete { background: #fee2e2; color: #b91c1c; }
-.type-chip.role { background: #dbeafe; color: #1d4ed8; }
-.type-chip.access { background: #fef3c7; color: #92400e; }
+.type-chip.creation { background: var(--info-bg); color: var(--info-700); border: 1px solid var(--info-border); }
+.type-chip.delete   { background: var(--error-bg); color: var(--error-700); border: 1px solid var(--error-border); }
+.type-chip.edit     { background: var(--warning-bg); color: var(--warning-700); border: 1px solid var(--warning-border); }
+.type-chip.access   { background: var(--success-bg); color: var(--success-700); border: 1px solid var(--success-border); }
+.type-chip.role     { background: var(--orange-bg-subtle); color: var(--orange-accent); border: 1px solid var(--orange-border); }
 
-.card-target {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 13px; font-weight: 600; color: #334155;
+.row-date {
+  display: flex; align-items: center; gap: 6px;
+  font-size: var(--text-xs); color: var(--text-secondary); font-weight: var(--weight-medium);
+  white-space: nowrap; flex-shrink: 0;
 }
-.card-target i { color: #94a3b8; font-size: 12px; width: 14px; }
+.row-date i { color: var(--orange-accent); font-size: 11px; }
 
-.card-date {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 11px; color: #94a3b8; font-weight: 500;
-  padding-top: 6px; border-top: 1px solid #f1f5f9;
+.row-id {
+  font-family: monospace; font-size: 11px; font-weight: var(--weight-bold); color: var(--neutral-700);
+  background: var(--neutral-100); border: 1px solid var(--neutral-200);
+  padding: 2px 8px; border-radius: var(--radius-xs); flex-shrink: 0;
 }
-.card-date i { font-size: 11px; }
 
-@media (max-width: 900px) {
-  .kanban-board { grid-template-columns: 1fr; }
+@media (max-width: 640px) {
+  .tab-bar { width: 100%; }
+  .tab-btn { flex: 1; justify-content: center; }
+  .row-date, .row-id { display: none; }
 }
 </style>

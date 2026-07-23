@@ -5,22 +5,32 @@
     <div class="page-header">
       <div>
         <h1 class="page-title">Notifications</h1>
-        <p class="page-sub">System alerts and activity updates</p>
+        <p class="page-sub">System alerts, record events, and workflow updates</p>
       </div>
       <button class="btn-ghost" @click="markAllRead" :disabled="!hasUnread">
         <i class="fas fa-check-double"></i> Mark All Read
       </button>
     </div>
 
-    <!-- STATS -->
+    <!-- STATS (Neomorphism) -->
     <div class="stats-row">
       <div class="stat-card">
-        <i class="fas fa-bell stat-icon green"></i>
-        <div><div class="stat-val">{{ notifications.length }}</div><div class="stat-label">Total</div></div>
+        <div class="stat-icon-wrap green">
+          <i :class="['fas', isMuted ? 'fa-bell-slash' : 'fa-bell']" :style="{ color: isMuted ? 'var(--error-500)' : undefined }"></i>
+        </div>
+        <div>
+          <div class="stat-val">{{ notifications.length }}</div>
+          <div class="stat-label">Total Notifications</div>
+        </div>
       </div>
       <div class="stat-card">
-        <i class="fas fa-envelope stat-icon blue"></i>
-        <div><div class="stat-val">{{ unreadCount }}</div><div class="stat-label">Unread</div></div>
+        <div class="stat-icon-wrap orange">
+          <i class="fas fa-envelope-open"></i>
+        </div>
+        <div>
+          <div class="stat-val">{{ unreadCount }}</div>
+          <div class="stat-label">Unread Alerts</div>
+        </div>
       </div>
     </div>
 
@@ -32,7 +42,7 @@
         @click="activeTab = t.val"
       >
         <i :class="['fas', t.icon]"></i>
-        {{ t.label }}
+        <span>{{ t.label }}</span>
       </button>
     </div>
 
@@ -44,7 +54,8 @@
     <!-- EMPTY -->
     <div v-else-if="filtered.length === 0" class="empty-state">
       <i class="fas fa-bell-slash empty-icon"></i>
-      <p>No notifications here.</p>
+      <p class="empty-title">No notifications here</p>
+      <p class="empty-sub">You're all caught up with your notifications.</p>
     </div>
 
     <!-- NOTIFICATION LIST -->
@@ -55,13 +66,13 @@
         :class="['notif-card', n.type.toLowerCase(), { unread: !n.is_read }]"
         @click="markRead(n)"
       >
-        <div class="notif-icon-wrap">
+        <div :class="['notif-icon-wrap', n.type.toLowerCase()]">
           <i :class="['fas', typeIcon(n.type)]"></i>
         </div>
         <div class="notif-body">
           <div class="notif-top">
             <span class="notif-title">{{ n.title }}</span>
-            <span class="notif-time">{{ formatTime(n.created_at) }}</span>
+            <span class="notif-time"><i class="fas fa-clock"></i> {{ formatTime(n.created_at) }}</span>
           </div>
           <p class="notif-msg">{{ n.message }}</p>
         </div>
@@ -74,8 +85,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useNotifications } from '../../composables/useNotifications'
 import api from '../../api/client'
 
+const { isMuted } = useNotifications()
 const notifications = ref<any[]>([])
 const loading = ref(false)
 const activeTab = ref('ALL')
@@ -151,97 +164,144 @@ onMounted(fetchNotifications)
 </script>
 
 <style scoped>
-.page { display: flex; flex-direction: column; gap: 20px; animation: fadeInUp 0.4s ease both; }
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(14px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
+.page { display: flex; flex-direction: column; gap: 16px; }
 
-.page-header { display: flex; justify-content: space-between; align-items: flex-start; }
-.page-title  { font-size: 22px; font-weight: 700; color: #1a2e1a; margin: 0; }
-.page-sub    { font-size: 13px; color: #7a9a7a; margin: 4px 0 0; }
+.page-header { display: flex; justify-content: space-between; align-items: flex-end; }
+.page-title  { font-size: var(--text-xl); font-weight: var(--weight-extrabold); color: var(--text-primary); }
+.page-sub    { font-size: var(--text-xs); color: var(--text-secondary); margin-top: 2px; }
 
-/* ─── Stats ─────────────────────────────────────────────────── */
+/* Stats */
 .stats-row { display: flex; gap: 14px; }
 .stat-card {
-  flex: 1; max-width: 180px;
-  display: flex; align-items: center; gap: 14px;
-  background: #f5fbf7; border: 1.5px solid #e0f0e8;
-  border-radius: 16px; padding: 16px 20px;
+  flex: 1; max-width: 220px; display: flex; align-items: center; gap: 12px;
+  background: var(--bg-base); box-shadow: var(--sku-btn-secondary-shadow); border-radius: var(--radius-lg);
+  padding: 12px 16px; transition: all var(--duration-base) var(--ease-out);
 }
-.stat-icon { font-size: 20px; }
-.stat-icon.green { color: #2f7d65; }
-.stat-icon.blue  { color: #3b82f6; }
-.stat-val   { font-size: 22px; font-weight: 700; color: #1a2e1a; }
-.stat-label { font-size: 12px; color: #7a9a7a; }
+.stat-card:hover { transform: translateY(-2px); box-shadow: var(--sku-btn-secondary-shadow-hover); }
 
-/* ─── Tabs ───────────────────────────────────────────────────── */
+.stat-icon-wrap {
+  width: 36px; height: 36px; border-radius: var(--radius-md);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; background: var(--bg-base);
+  box-shadow: var(--sku-btn-secondary-shadow); flex-shrink: 0;
+}
+.stat-icon-wrap.green  { color: var(--success-600); }
+.stat-icon-wrap.orange { color: var(--orange-accent); }
+
+.stat-val   { font-size: 20px; font-weight: var(--weight-extrabold); color: var(--text-primary); line-height: 1.1; }
+.stat-label { font-size: 11px; color: var(--text-secondary); font-weight: var(--weight-semibold); margin-top: 2px; }
+
+/* Tabs */
 .tab-bar { display: flex; gap: 8px; flex-wrap: wrap; }
 .tab-btn {
-  padding: 8px 16px; border-radius: 999px; border: 1.5px solid #e0e0e0;
-  background: white; font-size: 13px; font-weight: 500; cursor: pointer;
-  display: flex; align-items: center; gap: 6px; transition: all 0.2s; color: #555;
+  padding: 6px 14px; border-radius: var(--radius-pill); border: none;
+  background: var(--bg-base); box-shadow: var(--sku-btn-secondary-shadow);
+  font-size: 12px; font-weight: var(--weight-bold); cursor: pointer;
+  display: flex; align-items: center; gap: 6px; transition: all var(--duration-fast); color: var(--text-secondary);
 }
-.tab-btn.active { background: #2f7d65; color: white; border-color: #2f7d65; }
-.tab-btn:hover:not(.active) { border-color: #2f7d65; color: #2f7d65; }
+.tab-btn.active {
+  background: var(--orange-gradient); color: white;
+  box-shadow: var(--sku-btn-primary-shadow);
+}
+.tab-btn:hover:not(.active) { color: var(--orange-accent); box-shadow: var(--sku-btn-secondary-shadow-hover); transform: translateY(-1px); }
 
-/* ─── States ─────────────────────────────────────────────────── */
-.loading-state { text-align: center; padding: 40px; color: #999; font-size: 14px; }
+/* States */
+.loading-state { text-align: center; padding: 40px 20px; color: var(--orange-accent); font-size: var(--text-sm); font-weight: var(--weight-bold); }
 .empty-state {
-  text-align: center; padding: 60px 0; color: #bbb;
-  animation: fadeInUp 0.3s ease;
+  display: flex; flex-direction: column; align-items: center; padding: 48px 20px; text-align: center; gap: 6px;
+  background: var(--bg-base); border-radius: var(--radius-xl); box-shadow: var(--sku-btn-secondary-shadow);
 }
-.empty-icon { font-size: 48px; margin-bottom: 14px; display: block; }
+.empty-icon { font-size: 34px; color: var(--neutral-300); margin-bottom: 2px; }
+.empty-title { font-size: var(--text-sm); font-weight: var(--weight-bold); color: var(--text-primary); margin: 0; }
+.empty-sub   { font-size: var(--text-xs); color: var(--text-secondary); margin: 0; }
 
-/* ─── Notification cards ─────────────────────────────────────── */
-.notif-list { display: flex; flex-direction: column; gap: 10px; }
+/* Notification List — Compact 3D Skeuomorphic Tiles */
+.notif-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 2px;
+  overflow: visible;
+}
 
 .notif-card {
-  display: flex; align-items: flex-start; gap: 14px;
-  padding: 16px 18px; border-radius: 16px;
-  border: 1.5px solid #e8f0ea; background: #fff;
-  cursor: pointer; transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-base);
+  border: none;
+  box-shadow: var(--sku-btn-secondary-shadow);
+  cursor: pointer;
+  transition: all var(--duration-base) var(--ease-out);
   position: relative;
-  animation: fadeInUp 0.35s ease both;
+  user-select: none;
 }
-.notif-card:hover { border-color: #b7e4ca; box-shadow: 0 2px 12px rgba(47,125,101,0.08); transform: translateX(3px); }
 
-.notif-card.unread { background: #f5fbf7; border-color: #c8e6d4; }
+.notif-card:hover {
+  background: var(--bg-base);
+  box-shadow: var(--sku-btn-secondary-shadow-hover);
+  transform: translateY(-2px);
+}
 
-/* left icon colour by type */
-.notif-card.info    .notif-icon-wrap { background: #dbeafe; color: #1d4ed8; }
-.notif-card.success .notif-icon-wrap { background: #dcfce7; color: #15803d; }
-.notif-card.warning .notif-icon-wrap { background: #fef3cd; color: #b45309; }
-.notif-card.error   .notif-icon-wrap { background: #fee2e2; color: #b91c1c; }
+.notif-card:active {
+  box-shadow: var(--sku-btn-secondary-shadow-active);
+  transform: translateY(1px);
+}
+
+.notif-card.unread {
+  border: none !important;
+}
 
 .notif-icon-wrap {
-  width: 38px; height: 38px; border-radius: 12px; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 15px;
+  background: var(--bg-base);
+  box-shadow: var(--sku-btn-secondary-shadow);
+  color: var(--text-primary);
+  transition: all var(--duration-base) var(--ease-out);
+}
+
+.notif-card:hover .notif-icon-wrap {
+  transform: scale(1.05);
+  box-shadow: var(--sku-btn-secondary-shadow-hover);
+}
+
+.notif-icon-wrap.info,
+.notif-icon-wrap.success,
+.notif-icon-wrap.warning,
+.notif-icon-wrap.error {
+  color: var(--text-primary);
 }
 
 .notif-body { flex: 1; min-width: 0; }
-
-.notif-top {
-  display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 4px;
-}
-.notif-title { font-size: 13px; font-weight: 700; color: #1a2e1a; }
-.notif-time  { font-size: 11px; color: #aaa; flex-shrink: 0; }
-.notif-msg   { font-size: 13px; color: #555; margin: 0; line-height: 1.5; }
+.notif-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
+.notif-title { font-size: 13px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.01em; transition: color var(--duration-base); }
+.notif-card:hover .notif-title { color: var(--orange-accent); }
+.notif-time  { font-size: 11px; color: var(--text-secondary); flex-shrink: 0; display: flex; align-items: center; gap: 4px; font-weight: 500; }
+.notif-msg   { font-size: 12px; color: var(--text-secondary); margin: 0; line-height: 1.4; font-weight: 400; }
 
 .unread-dot {
-  width: 8px; height: 8px; border-radius: 50%; background: #2f7d65;
-  flex-shrink: 0; margin-top: 4px;
+  width: 8px; height: 8px; border-radius: 50%; background: var(--orange-accent);
+  flex-shrink: 0; box-shadow: 0 0 6px var(--orange-glow);
 }
 
-/* ─── Buttons ────────────────────────────────────────────────── */
 .btn-ghost {
-  background: #f3f3f3; color: #444; border: none;
-  padding: 10px 20px; border-radius: 999px; font-size: 13px;
-  font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;
-  transition: background 0.2s;
+  background: var(--bg-base); color: var(--text-secondary); border: none;
+  padding: 6px 14px; border-radius: var(--radius-pill); font-size: 12px;
+  font-weight: var(--weight-bold); cursor: pointer; display: flex; align-items: center; gap: 6px;
+  box-shadow: var(--sku-btn-secondary-shadow); transition: all var(--duration-base);
 }
-.btn-ghost:hover:not(:disabled) { background: #e8e8e8; }
+.btn-ghost:hover:not(:disabled) { color: var(--orange-accent); box-shadow: var(--sku-btn-secondary-shadow-hover); transform: translateY(-1px); }
 .btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
 </style>

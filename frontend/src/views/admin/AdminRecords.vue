@@ -4,25 +4,29 @@
     <!-- PAGE HEADER -->
     <div class="page-header">
       <div>
-        <h1 class="page-title">Records</h1>
-        <p class="page-sub">Manage all sensitive disclosure records</p>
+        <h1 class="page-title">Disclosure Records</h1>
+        <p class="page-sub">Centralized repository for sensitive disclosure documentation</p>
       </div>
       <button class="btn-primary" @click="showCreate = true">
         <i class="fas fa-plus"></i> New Record
       </button>
     </div>
 
-    <!-- STATS ROW -->
+    <!-- STATS ROW (Neomorphism) -->
     <div class="stats-row">
       <div class="stat-card">
-        <i class="fas fa-database stat-icon green"></i>
+        <div class="stat-icon-wrap green">
+          <i class="fas fa-database"></i>
+        </div>
         <div>
           <div class="stat-val">{{ total }}</div>
           <div class="stat-label">Total Records</div>
         </div>
       </div>
       <div class="stat-card">
-        <i class="fas fa-calendar-day stat-icon blue"></i>
+        <div class="stat-icon-wrap blue">
+          <i class="fas fa-calendar-day"></i>
+        </div>
         <div>
           <div class="stat-val">{{ todayCount }}</div>
           <div class="stat-label">Added Today</div>
@@ -30,7 +34,7 @@
       </div>
     </div>
 
-    <!-- SEARCH BAR -->
+    <!-- SEARCH TOOLBAR -->
     <div class="toolbar">
       <div class="search-wrap">
         <i class="fas fa-search search-icon"></i>
@@ -38,35 +42,45 @@
           v-model="search"
           @input="fetchRecords"
           class="search-input"
-          placeholder="Search by name, PAN, record ID…"
+          placeholder="Search by name, PAN, employee code, record ID…"
         />
       </div>
     </div>
 
-    <!-- TILE GRID -->
+    <!-- TILE GRID / DATA LIST -->
     <div v-if="loading" class="loading-state">
       <i class="fas fa-spinner fa-spin"></i> Loading records…
     </div>
 
     <div v-else-if="records.length === 0" class="empty-state">
       <i class="fas fa-inbox"></i>
-      <p>No records found.</p>
+      <p>No disclosure records found.</p>
     </div>
 
     <div v-else class="tile-grid">
       <div v-for="record in records" :key="record.public_id" class="record-tile">
         <div class="tile-header">
-          <div class="tile-icon"><i class="fas fa-file-alt"></i></div>
-          <div class="tile-name">{{ record.name }}</div>
+          <div class="tile-icon"><i class="fas fa-file-shield"></i></div>
+          <div class="tile-name-wrap">
+            <div class="tile-name">{{ record.name }}</div>
+            <div class="tile-subname" v-if="record.designation">{{ record.designation }}</div>
+          </div>
         </div>
         <div class="tile-details">
           <div class="tile-row">
             <i class="fas fa-id-card"></i>
+            <span class="tile-label">PAN:</span>
             <span class="tile-pan">{{ record.pan }}</span>
           </div>
           <div class="tile-row">
             <i class="fas fa-building"></i>
+            <span class="tile-label">Company:</span>
             <span>{{ record.source_company || '—' }}</span>
+          </div>
+          <div class="tile-row">
+            <i class="fas fa-barcode"></i>
+            <span class="tile-label">Emp Code:</span>
+            <span>{{ record.employee_code || '—' }}</span>
           </div>
         </div>
         <div class="tile-footer">
@@ -82,13 +96,13 @@
           <button class="icon-action view" title="View Details" @click="$router.push(`/records/${record.public_id}`)">
             <i class="fas fa-eye"></i>
           </button>
-          <button class="icon-action edit" title="Edit" @click="openEdit(record)">
+          <button class="icon-action edit" title="Edit Record" @click="openEdit(record)">
             <i class="fas fa-pen"></i>
           </button>
           <button class="icon-action assign" title="Assign Access" @click="openAssign(record)">
             <i class="fas fa-user-shield"></i>
           </button>
-          <button class="icon-action delete" title="Delete" @click="deleteRecord(record)">
+          <button class="icon-action delete" title="Delete Record" @click="deleteRecord(record)">
             <i class="fas fa-trash"></i>
           </button>
         </div>
@@ -106,51 +120,58 @@
       </button>
     </div>
 
-    <!-- ─── CREATE RECORD MODAL ──────────────────────────────── -->
+    <!-- ─── CREATE RECORD MODAL (Glassmorphism) ──────────────── -->
     <teleport to="body">
     <div class="modal-overlay" v-if="showCreate" @click.self="showCreate = false">
       <div class="modal">
         <div class="modal-header">
-          <h2>New Record</h2>
-          <button class="modal-close" @click="showCreate = false"><i class="fas fa-times"></i></button>
+          <div class="modal-title-group">
+            <div class="modal-icon-wrap"><i class="fas fa-file-circle-plus"></i></div>
+            <h2>Create New Disclosure Record</h2>
+          </div>
+          <button class="modal-close" @click="showCreate = false" aria-label="Close"><i class="fas fa-times"></i></button>
         </div>
         <div class="modal-body">
           <div class="form-grid">
             <div class="form-group">
-              <label>Full Name</label>
-              <input v-model="form.name" />
+              <label>Full Name *</label>
+              <input v-model="form.name" maxlength="255" placeholder="e.g. Rahul Sharma" @input="form.name = form.name.replace(/[^a-zA-Z\s\.\-']/g, '')" />
             </div>
             <div class="form-group">
-              <label>Designation</label>
-              <input v-model="form.designation" />
+              <label>Designation *</label>
+              <input v-model="form.designation" maxlength="255" placeholder="e.g. Senior Manager" />
             </div>
             <div class="form-group">
-              <label>Employee Code</label>
-              <input v-model="form.employee_code" />
+              <label>Employee Code *</label>
+              <input v-model="form.employee_code" maxlength="50" placeholder="e.g. EMP-2026/01" @input="form.employee_code = form.employee_code.replace(/[^a-zA-Z0-9\-\/]/g, '')" />
             </div>
             <div class="form-group">
-              <label>PAN</label>
-              <input v-model="form.pan" />
+              <label>PAN Card Number *</label>
+              <input v-model="form.pan" maxlength="10" placeholder="ABCDE1234F" @input="form.pan = form.pan.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10)" />
             </div>
             <div class="form-group">
-              <label>Source Company</label>
-              <input v-model="form.source_company" />
+              <label>Disclosure Company *</label>
+              <input v-model="form.source_company" maxlength="255" placeholder="e.g. Negen Capital" />
             </div>
             <div class="form-group">
-              <label>Date Received</label>
-              <input type="date" v-model="form.info_received_date" />
+              <label>Date Received *</label>
+              <input type="date" v-model="form.info_received_date" :max="todayDate" />
             </div>
             <div class="form-group">
-              <label>Disclosure Name</label>
-              <input v-model="form.disclosure_name" />
+              <label>Disclosure Name *</label>
+              <input v-model="form.disclosure_name" maxlength="255" placeholder="e.g. Officer Name" @input="form.disclosure_name = form.disclosure_name.replace(/[^a-zA-Z\s\.\-']/g, '')" />
             </div>
             <div class="form-group">
-              <label>Disclosure Designation</label>
-              <input v-model="form.disclosure_designation" />
+              <label>Disclosure Designation (Optional)</label>
+              <input v-model="form.disclosure_designation" maxlength="255" placeholder="e.g. Compliance Officer" />
+            </div>
+            <div class="form-group">
+              <label>Disclosure Department (Optional)</label>
+              <input v-model="form.disclosure_department" maxlength="255" placeholder="e.g. Legal & Compliance" />
             </div>
             <div class="form-group full-width">
-              <label>Information Details</label>
-              <textarea v-model="form.info_details" rows="3"></textarea>
+              <label>Information Details *</label>
+              <textarea v-model="form.info_details" rows="3" placeholder="Enter detailed confidential disclosure notes..."></textarea>
             </div>
           </div>
           <p class="error-msg" v-if="createError">{{ createError }}</p>
@@ -159,7 +180,7 @@
           <button class="btn-ghost" @click="showCreate = false">Cancel</button>
           <button class="btn-primary" @click="createRecord" :disabled="creating">
             <i class="fas fa-spinner fa-spin" v-if="creating"></i>
-            {{ creating ? 'Creating…' : 'Create Record' }}
+            <span>{{ creating ? 'Creating…' : 'Create Record' }}</span>
           </button>
         </div>
       </div>
@@ -171,39 +192,96 @@
     <div class="modal-overlay" v-if="showAssign" @click.self="showAssign = false">
       <div class="modal modal-sm">
         <div class="modal-header">
-          <h2>Assign Access — {{ assignRecord?.public_id }}</h2>
-          <button class="modal-close" @click="showAssign = false"><i class="fas fa-times"></i></button>
+          <div class="modal-title-group">
+            <div class="modal-icon-wrap"><i class="fas fa-user-lock"></i></div>
+            <h2>Assign Access Permissions</h2>
+          </div>
+          <button class="modal-close" @click="showAssign = false" aria-label="Close"><i class="fas fa-times"></i></button>
         </div>
         <div class="modal-body">
-          <div class="form-group position-relative">
-            <label>Search User</label>
-            <input v-model="userSearchQuery" placeholder="Type name or ID..." @focus="showUserDropdown = true" />
-            <div class="dropdown-list" v-if="showUserDropdown && filteredUsers.length > 0">
-              <div class="dropdown-item" v-for="u in filteredUsers" :key="u.public_id" @click="selectUser(u)">
-                <div class="dropdown-user-info">
-                  <div class="dropdown-user-name">{{ u.name }}</div>
-                  <div class="dropdown-user-id">{{ u.public_id }}</div>
+          <div class="form-group">
+            <label>Search & Select User</label>
+            <div class="search-input-wrap">
+              <input
+                v-model="userSearchQuery"
+                placeholder="Type user name, email, or ID..."
+                @focus="showUserDropdown = true"
+                @input="onSearchInput"
+              />
+              <button
+                type="button"
+                class="search-clear-btn"
+                v-if="userSearchQuery && !assignForm.user_id"
+                @click="userSearchQuery = ''; showUserDropdown = true"
+                title="Clear search"
+              >
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+
+            <!-- Selected User Confirmation Card -->
+            <div class="selected-user-card" v-if="assignForm.user_id">
+              <div class="selected-user-left">
+                <i class="fas fa-user-check text-success"></i>
+                <div>
+                  <div class="selected-name">{{ userSearchQuery }}</div>
+                  <div class="selected-id">{{ assignForm.user_id }}</div>
                 </div>
+              </div>
+              <button type="button" class="btn-ghost btn-xs" @click="clearSelectedUser">Change User</button>
+            </div>
+
+            <!-- Inline Search Results (Not absolute so never clipped or covered!) -->
+            <div class="search-results-box" v-else-if="showUserDropdown">
+              <div class="search-results-header" v-if="filteredUsers.length > 0">
+                <span><i class="fas fa-check-circle text-success"></i> Found {{ filteredUsers.length }} user(s)</span>
+                <small>Click to select</small>
+              </div>
+              <div class="search-result-items" v-if="filteredUsers.length > 0">
+                <div class="search-result-item" v-for="u in filteredUsers" :key="u.public_id" @click="selectUser(u)">
+                  <div class="dropdown-user-info">
+                    <div class="dropdown-user-name">
+                      {{ u.name }}
+                      <span v-if="u.role" class="user-role-badge">{{ u.role }}</span>
+                    </div>
+                    <div class="dropdown-user-id">{{ u.public_id }} &bull; {{ u.email }}</div>
+                  </div>
+                  <button type="button" class="btn-select-user"><i class="fas fa-check"></i> Select</button>
+                </div>
+              </div>
+              <div class="search-no-results" v-else-if="userSearchQuery">
+                <i class="fas fa-user-slash"></i>
+                <span>No user found matching "<strong>{{ userSearchQuery }}</strong>"</span>
+              </div>
+              <div class="search-no-results" v-else>
+                <i class="fas fa-search"></i>
+                <span>Type above or select from all {{ allUsers.length }} user(s)</span>
               </div>
             </div>
           </div>
-          <div class="form-group" v-if="assignForm.user_id">
-            <label>Selected User ID</label>
-            <input v-model="assignForm.user_id" disabled />
-          </div>
           <div class="form-group">
-            <label>Access Type</label>
+            <label>Access Privilege</label>
             <select v-model="assignForm.access_type">
-              <option value="VIEW">View Only</option>
-              <option value="EDIT">Edit Access</option>
+              <option value="VIEW">View Only Access</option>
+              <option value="EDIT">Full Edit Access</option>
             </select>
           </div>
+
+          <div v-if="isAssigningEditToViewer" class="viewer-restriction-warning">
+            <i class="fas fa-exclamation-circle"></i>
+            <div>
+              <strong>Role Restriction:</strong>
+              <p>Full edit access can't be given unless the user is a <strong>Collaborator</strong>.</p>
+            </div>
+          </div>
+
           <p class="error-msg" v-if="assignError">{{ assignError }}</p>
         </div>
         <div class="modal-footer">
           <button class="btn-ghost" @click="showAssign = false">Cancel</button>
-          <button class="btn-primary" @click="assignAccess" :disabled="assigning">
-            {{ assigning ? 'Assigning…' : 'Assign' }}
+          <button class="btn-primary" @click="assignAccess" :disabled="assigning || !assignForm.user_id || isAssigningEditToViewer">
+            <i class="fas fa-spinner fa-spin" v-if="assigning"></i>
+            <span>{{ assigning ? 'Assigning…' : 'Assign Access' }}</span>
           </button>
         </div>
       </div>
@@ -215,49 +293,56 @@
     <div class="modal-overlay" v-if="showEdit" @click.self="showEdit = false">
       <div class="modal">
         <div class="modal-header">
-          <h2>Edit — {{ editRecord?.public_id }}</h2>
-          <button class="modal-close" @click="showEdit = false"><i class="fas fa-times"></i></button>
+          <div class="modal-title-group">
+            <div class="modal-icon-wrap"><i class="fas fa-pen-to-square"></i></div>
+            <h2>Edit Record — {{ editRecord?.public_id }}</h2>
+          </div>
+          <button class="modal-close" @click="showEdit = false" aria-label="Close"><i class="fas fa-times"></i></button>
         </div>
         <div class="modal-body">
           <div v-if="editing && !editForm.name" class="loading-state">
-            <i class="fas fa-spinner fa-spin"></i> Loading record details…
+            <i class="fas fa-spinner fa-spin"></i> Fetching record details…
           </div>
           <div class="form-grid" v-else>
             <div class="form-group">
-              <label>Full Name</label>
-              <input v-model="editForm.name" />
+              <label>Full Name *</label>
+              <input v-model="editForm.name" maxlength="255" @input="editForm.name = editForm.name.replace(/[^a-zA-Z\s\.\-']/g, '')" />
             </div>
             <div class="form-group">
-              <label>Designation</label>
-              <input v-model="editForm.designation" />
+              <label>Designation *</label>
+              <input v-model="editForm.designation" maxlength="255" />
             </div>
             <div class="form-group">
-              <label>Employee Code</label>
-              <input v-model="editForm.employee_code" />
+              <label>Employee Code *</label>
+              <input v-model="editForm.employee_code" maxlength="50" @input="editForm.employee_code = editForm.employee_code.replace(/[^a-zA-Z0-9\-\/]/g, '')" />
             </div>
             <div class="form-group">
-              <label>PAN</label>
-              <input v-model="editForm.pan" />
+              <label>PAN Card Number *</label>
+              <input v-model="editForm.pan" maxlength="10" placeholder="ABCDE1234F" @input="editForm.pan = editForm.pan.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10)" />
             </div>
             <div class="form-group">
-              <label>Source Company</label>
-              <input v-model="editForm.source_company" />
+              <label>Disclosure Company *</label>
+              <input v-model="editForm.source_company" maxlength="255" />
             </div>
             <div class="form-group">
-              <label>Date Received</label>
-              <input type="date" v-model="editForm.info_received_date" />
+              <label>Date Received *</label>
+              <input type="date" v-model="editForm.info_received_date" :max="todayDate" />
             </div>
             <div class="form-group">
-              <label>Disclosure Name</label>
-              <input v-model="editForm.disclosure_name" />
+              <label>Disclosure Name *</label>
+              <input v-model="editForm.disclosure_name" maxlength="255" @input="editForm.disclosure_name = editForm.disclosure_name.replace(/[^a-zA-Z\s\.\-']/g, '')" />
             </div>
             <div class="form-group">
-              <label>Disclosure Designation</label>
-              <input v-model="editForm.disclosure_designation" />
+              <label>Disclosure Designation (Optional)</label>
+              <input v-model="editForm.disclosure_designation" maxlength="255" />
+            </div>
+            <div class="form-group">
+              <label>Disclosure Department (Optional)</label>
+              <input v-model="editForm.disclosure_department" maxlength="255" />
             </div>
             <div class="form-group full-width">
-              <label>Information Details</label>
-              <textarea v-model="editForm.info_details" rows="3"></textarea>
+              <label>Information Details *</label>
+              <textarea v-model="editForm.info_details" rows="3" placeholder="Enter disclosure details..."></textarea>
             </div>
           </div>
           <p class="error-msg" v-if="editError">{{ editError }}</p>
@@ -265,28 +350,32 @@
         <div class="modal-footer">
           <button class="btn-ghost" @click="showEdit = false">Cancel</button>
           <button class="btn-primary" @click="saveEdit" :disabled="editing">
-            {{ editing ? 'Saving…' : 'Save Changes' }}
+            <i class="fas fa-spinner fa-spin" v-if="editing"></i>
+            <span>{{ editing ? 'Saving…' : 'Save Changes' }}</span>
           </button>
         </div>
       </div>
     </div>
     </teleport>
 
-    <!-- ─── CONFIRM MODAL ────────────────────────────────────── -->
+    <!-- ─── CONFIRM DELETE MODAL ────────────────────────────── -->
     <teleport to="body">
       <div class="modal-overlay" v-if="confirmDialog.show" @click.self="closeConfirm">
         <div class="modal confirm-modal">
           <div class="modal-header">
-            <h2>{{ confirmDialog.title }}</h2>
-            <button class="modal-close" @click="closeConfirm"><i class="fas fa-times"></i></button>
+            <div class="modal-title-group">
+              <div class="modal-icon-wrap error"><i class="fas fa-triangle-exclamation"></i></div>
+              <h2>{{ confirmDialog.title }}</h2>
+            </div>
+            <button class="modal-close" @click="closeConfirm" aria-label="Close"><i class="fas fa-times"></i></button>
           </div>
           <div class="modal-body">
             <p>{{ confirmDialog.message }}</p>
           </div>
           <div class="modal-footer">
             <button class="btn-ghost" @click="closeConfirm">Cancel</button>
-            <button class="btn-primary confirm-btn" @click="confirmAction">
-              Confirm
+            <button class="btn-danger" @click="confirmAction">
+              Confirm Delete
             </button>
           </div>
         </div>
@@ -340,6 +429,66 @@ function formatDate(d: string) {
   return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+const todayDate = computed(() => {
+  return new Date().toISOString().split('T')[0]
+})
+
+function formatApiError(err: any): string {
+  const data = err?.response?.data
+  if (data && typeof data === 'object') {
+    if (data.error) return data.error
+    if (data.detail) return data.detail
+    return Object.entries(data)
+      .map(([key, val]: [string, any]) => {
+        const field = key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')
+        const error = Array.isArray(val) ? val[0] : val
+        return `${field}: ${error}`
+      })
+      .join(', ')
+  }
+  return ''
+}
+
+function validateRecord(recordData: any): string | null {
+  if (!recordData.name || recordData.name.trim().length < 2) {
+    return "Full Name must be at least 2 characters long."
+  }
+  if (!/^[a-zA-Z\s\.\-']+$/.test(recordData.name)) {
+    return "Full Name must contain only letters, spaces, dots, hyphens, and single quotes."
+  }
+  if (!recordData.designation || recordData.designation.trim().length < 2) {
+    return "Designation must be at least 2 characters long."
+  }
+  if (!recordData.employee_code || recordData.employee_code.trim().length < 2) {
+    return "Employee Code must be at least 2 characters long."
+  }
+  if (!/^[a-zA-Z0-9\-\/]+$/.test(recordData.employee_code)) {
+    return "Employee Code must contain only alphanumeric characters, hyphens, and slashes."
+  }
+  if (!recordData.pan || !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(recordData.pan.toUpperCase())) {
+    return "PAN must be in standard Indian format (e.g. ABCDE1234F)."
+  }
+  if (!recordData.source_company || recordData.source_company.trim().length < 2) {
+    return "Disclosure Company must be at least 2 characters long."
+  }
+  if (!recordData.info_received_date) {
+    return "Date Received is required."
+  }
+  if (recordData.info_received_date > todayDate.value) {
+    return "Date Received cannot be in the future."
+  }
+  if (!recordData.disclosure_name || recordData.disclosure_name.trim().length < 2) {
+    return "Disclosure Name must be at least 2 characters long."
+  }
+  if (!/^[a-zA-Z\s\.\-']+$/.test(recordData.disclosure_name)) {
+    return "Disclosure Name must contain only letters, spaces, dots, hyphens, and single quotes."
+  }
+  if (!recordData.info_details || recordData.info_details.trim().length < 2) {
+    return "Information Details must be at least 2 characters long."
+  }
+  return null
+}
+
 // ─── Create ────────────────────────────────────────────────────
 const showCreate = ref(false)
 const creating = ref(false)
@@ -347,10 +496,16 @@ const createError = ref('')
 const form = ref({
   name: '', designation: '', employee_code: '', pan: '',
   source_company: '', info_details: '', info_received_date: '',
-  disclosure_name: '', disclosure_designation: ''
+  disclosure_name: '', disclosure_designation: '', disclosure_department: ''
 })
 
 async function createRecord() {
+  const validationError = validateRecord(form.value)
+  if (validationError) {
+    createError.value = validationError
+    notify('Validation Error', validationError, 'WARNING')
+    return
+  }
   creating.value = true
   createError.value = ''
   try {
@@ -360,8 +515,8 @@ async function createRecord() {
     Object.keys(form.value).forEach(k => (form.value as any)[k] = '')
     fetchRecords()
   } catch (e: any) {
-    createError.value = JSON.stringify(e?.response?.data || 'Error creating record')
-    notify('Error', 'Failed to create record.', 'ERROR')
+    createError.value = formatApiError(e) || 'Error creating record'
+    notify('Error', createError.value, 'ERROR')
   } finally {
     creating.value = false
   }
@@ -374,42 +529,77 @@ const assignError = ref('')
 const assignRecord = ref<any>(null)
 const assignForm = ref({ user_id: '', access_type: 'VIEW' })
 
+const selectedUserObj = ref<any>(null)
+const isAssigningEditToViewer = computed(() => {
+  if (!selectedUserObj.value) return false
+  const role = (selectedUserObj.value.role || '').toUpperCase()
+  return role === 'VIEWER' && assignForm.value.access_type === 'EDIT'
+})
+
 const allUsers = ref<any[]>([])
 const userSearchQuery = ref('')
 const showUserDropdown = ref(false)
 
 const filteredUsers = computed(() => {
-  const q = userSearchQuery.value.toLowerCase()
+  const q = (userSearchQuery.value || '').toLowerCase().trim()
   if (!q) return allUsers.value
   return allUsers.value.filter(u => 
-    u.name.toLowerCase().includes(q) || 
-    u.public_id.toLowerCase().includes(q)
+    (u.name && u.name.toLowerCase().includes(q)) || 
+    (u.public_id && u.public_id.toLowerCase().includes(q)) ||
+    (u.email && u.email.toLowerCase().includes(q)) ||
+    (u.role && u.role.toLowerCase().includes(q))
   )
 })
 
 async function fetchAllUsers() {
   try {
-    const res = await api.get('auth/users/', { params: { page_size: 100 } })
-    allUsers.value = res.data.results
-  } catch (e) { console.error(e) }
+    const res = await api.get('auth/users/', { params: { page_size: 100, include_all: 'true' } })
+    allUsers.value = res.data.results || res.data || []
+  } catch (e: any) {
+    console.error('Error loading users:', e)
+    assignError.value = e?.response?.data?.error || 'Failed to load user list from server.'
+  }
 }
 
 function openAssign(record: any) {
   assignRecord.value = record
   assignForm.value = { user_id: '', access_type: 'VIEW' }
   userSearchQuery.value = ''
+  selectedUserObj.value = null
   showUserDropdown.value = false
-  if (allUsers.value.length === 0) fetchAllUsers()
+  assignError.value = ''
+  fetchAllUsers()
   showAssign.value = true
 }
 
 function selectUser(user: any) {
   assignForm.value.user_id = user.public_id
   userSearchQuery.value = user.name
+  selectedUserObj.value = user
   showUserDropdown.value = false
 }
 
+function clearSelectedUser() {
+  assignForm.value.user_id = ''
+  userSearchQuery.value = ''
+  selectedUserObj.value = null
+  showUserDropdown.value = true
+}
+
+function onSearchInput() {
+  showUserDropdown.value = true
+  if (!userSearchQuery.value) {
+    assignForm.value.user_id = ''
+    selectedUserObj.value = null
+  }
+}
+
 async function assignAccess() {
+  if (isAssigningEditToViewer.value) {
+    assignError.value = "Full edit access can't be given unless the user is a Collaborator."
+    notify('Role Restriction', assignError.value, 'WARNING')
+    return
+  }
   assigning.value = true
   assignError.value = ''
   try {
@@ -421,8 +611,8 @@ async function assignAccess() {
     notify('Access Assigned', `Assigned ${assignForm.value.access_type} access to ${userSearchQuery.value}.`, 'SUCCESS')
     showAssign.value = false
   } catch (e: any) {
-    assignError.value = e?.response?.data?.error || 'Failed to assign'
-    notify('Error', 'Failed to assign access.', 'ERROR')
+    assignError.value = e?.response?.data?.error || 'Failed to assign access.'
+    notify('Error', assignError.value, 'ERROR')
   } finally {
     assigning.value = false
   }
@@ -439,7 +629,7 @@ async function openEdit(record: any) {
   editRecord.value = record
   editForm.value = {}
   showEdit.value = true
-  editing.value = true  // show loading state while fetching
+  editing.value = true
   try {
     const res = await api.get(`records/${record.public_id}/`)
     editForm.value = { ...res.data }
@@ -452,6 +642,12 @@ async function openEdit(record: any) {
 }
 
 async function saveEdit() {
+  const validationError = validateRecord(editForm.value)
+  if (validationError) {
+    editError.value = validationError
+    notify('Validation Error', validationError, 'WARNING')
+    return
+  }
   editing.value = true
   editError.value = ''
   try {
@@ -460,14 +656,14 @@ async function saveEdit() {
     showEdit.value = false
     fetchRecords()
   } catch (e: any) {
-    editError.value = e?.response?.data?.error || 'Failed to update record'
-    notify('Error', 'Failed to update record.', 'ERROR')
+    editError.value = formatApiError(e) || 'Failed to update record'
+    notify('Error', editError.value, 'ERROR')
   } finally {
     editing.value = false
   }
 }
 
-// ─── Confirm Modal Logic ──────────────────────────────────────
+// ─── Confirm Delete ──────────────────────────────────────────
 const confirmDialog = ref({
   show: false,
   title: '',
@@ -499,7 +695,7 @@ function confirmAction() {
 function deleteRecord(record: any) {
   openConfirm(
     "Confirm Deletion",
-    `Are you sure you want to delete record ${record.public_id}?`,
+    `Are you sure you want to permanently delete record ${record.public_id} (${record.name})?`,
     async () => {
       try {
         await api.delete(`records/${record.public_id}/delete/`)
@@ -513,266 +709,435 @@ function deleteRecord(record: any) {
   )
 }
 
-
-onMounted(fetchRecords)
+onMounted(() => {
+  fetchRecords()
+  fetchAllUsers()
+})
 </script>
 
 <style scoped>
-/* ─── Page shell ─────────────────────────────────────────────── */
-.page { display: flex; flex-direction: column; gap: 20px; animation: fadeInUp 0.4s ease both; }
+.page { display: flex; flex-direction: column; gap: 24px; }
 
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(14px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
+/* Header */
+.page-header { display: flex; justify-content: space-between; align-items: flex-end; }
+.page-title { font-size: var(--text-2xl); font-weight: var(--weight-extrabold); color: var(--text-primary); }
+.page-sub { font-size: var(--text-xs); color: var(--text-secondary); margin-top: 4px; }
 
-/* ─── Header ─────────────────────────────────────────────────── */
-.page-header { display: flex; justify-content: space-between; align-items: flex-start; }
-.page-title  { font-size: 22px; font-weight: 700; color: #1a2e1a; margin: 0; }
-.page-sub    { font-size: 13px; color: #7a9a7a; margin: 4px 0 0; }
-
-/* ─── Stats ─────────────────────────────────────────────────── */
-.stats-row { display: flex; gap: 14px; }
+/* Stats Row (Neomorphism) */
+.stats-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
 .stat-card {
-  flex: 1; display: flex; align-items: center; gap: 14px;
-  background: linear-gradient(135deg, #f5fbf7 0%, #ecf5ef 100%);
-  border: 1.5px solid rgba(47, 125, 101, 0.12);
-  border-radius: 16px; padding: 16px 20px;
-  box-shadow: 0 4px 12px rgba(47, 125, 101, 0.04);
-  transition: transform 0.3s cubic-bezier(0.4,0,0.2,1), box-shadow 0.3s ease;
-  position: relative; overflow: hidden;
+  display: flex; align-items: center; gap: 16px;
+  background: var(--bg-base);
+  box-shadow: var(--neu-card);
+  border-radius: var(--radius-xl);
+  padding: 18px 24px;
+  transition: transform var(--duration-base) var(--ease-out);
 }
-.stat-card::before {
-  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.8), transparent);
-}
-.stat-card:nth-child(1) { animation: fadeInUp 0.4s ease 0.05s both; }
-.stat-card:nth-child(2) { animation: fadeInUp 0.4s ease 0.12s both; }
-.stat-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 24px rgba(47, 125, 101, 0.1);
-}
-.stat-icon { font-size: 22px; transition: transform 0.2s ease; }
-.stat-card:hover .stat-icon { transform: scale(1.15); }
-.stat-icon.green { color: #2f7d65; }
-.stat-icon.blue { color: #3b82f6; }
-.stat-val   { font-size: 24px; font-weight: 700; color: #1a2e1a; }
-.stat-label { font-size: 12px; color: #7a9a7a; }
+.stat-card:hover { transform: translateY(-2px); box-shadow: var(--neu-card-hover); }
 
-/* ─── Toolbar ────────────────────────────────────────────────── */
+.stat-icon-wrap {
+  width: 46px; height: 46px; border-radius: var(--radius-lg);
+  display: flex; align-items: center; justify-content: center;
+  font-size: var(--text-xl); background: var(--bg-base);
+  box-shadow: var(--neu-inset); flex-shrink: 0;
+}
+.stat-icon-wrap.green { color: var(--success-600); }
+.stat-icon-wrap.blue  { color: var(--info-600); }
+
+.stat-val { font-size: var(--text-2xl); font-weight: var(--weight-extrabold); color: var(--text-primary); line-height: 1.1; }
+.stat-label { font-size: var(--text-xs); color: var(--text-secondary); font-weight: var(--weight-semibold); margin-top: 2px; }
+
+/* Toolbar */
 .toolbar { display: flex; gap: 12px; }
-.search-wrap { position: relative; flex: 1; max-width: 420px; }
+.search-wrap { position: relative; flex: 1; max-width: 440px; }
 .search-icon {
-  position: absolute; left: 18px; top: 50%; transform: translateY(-50%);
-  color: #5a8a6a; font-size: 15px; z-index: 1;
+  position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+  color: var(--neutral-700); font-size: var(--text-sm); pointer-events: none;
 }
 .search-input {
-  width: 100%; padding: 13px 16px 13px 48px; border-radius: 999px;
-  border: 1.5px solid rgba(47, 125, 101, 0.15); 
-  background: rgba(255, 255, 255, 0.7); 
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  font-size: 14px; font-weight: 500; color: #1a2e1a; outline: none;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
-  box-sizing: border-box;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  width: 100%; padding: 12px 20px 12px 44px; border-radius: var(--radius-pill);
+  border: none; background: var(--bg-base);
+  box-shadow: var(--shadow-sm); font-size: var(--text-sm); color: var(--text-primary);
+  outline: none; transition: all var(--duration-fast);
 }
-.search-input::placeholder { color: #94a3b8; font-weight: 400; }
-.search-input:hover { background: rgba(255, 255, 255, 0.9); border-color: rgba(47, 125, 101, 0.3); }
-.search-input:focus { 
-  border-color: #2f7d65; background: #fff; 
-  box-shadow: 0 8px 20px rgba(47, 125, 101, 0.12), 0 0 0 4px rgba(47, 125, 101, 0.08);
-  transform: translateY(-1px);
+.search-input:focus {
+  background: var(--bg-base);
+  box-shadow: var(--shadow-md), 0 0 0 3px var(--orange-glow);
 }
 
-/* ─── Buttons ────────────────────────────────────────────────── */
-.btn-primary {
-  background: #2f7d65; color: white; border: none;
-  padding: 10px 20px; border-radius: 999px; font-size: 13px;
-  font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;
-  transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
-}
-.btn-primary:hover { background: #256554; transform: translateY(-1px); box-shadow: 0 4px 14px rgba(47, 125, 101, 0.25); }
-.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-.btn-ghost {
-  background: rgba(47, 125, 101, 0.06); color: #2f7d65; border: none;
-  padding: 10px 20px; border-radius: 999px; font-size: 13px;
-  font-weight: 600; cursor: pointer; transition: all 0.2s;
-}
-.btn-ghost:hover { background: rgba(47, 125, 101, 0.12); color: #1a5c3a; }
-
-/* ─── Tile Grid ──────────────────────────────────────────────── */
+/* Tile Grid */
 .tile-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 18px; animation: fadeInUp 0.4s ease 0.1s both;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 20px;
 }
 
 .record-tile {
-  background: white; border-radius: 18px; padding: 0;
-  border: 1.5px solid rgba(47, 125, 101, 0.1);
-  box-shadow: 0 2px 10px rgba(47, 125, 101, 0.04);
+  background: var(--bg-base);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--neu-card);
   display: flex; flex-direction: column;
-  transition: transform 0.25s cubic-bezier(0.4,0,0.2,1), box-shadow 0.25s ease;
-  overflow: hidden; animation: fadeInUp 0.3s ease both;
+  transition: transform var(--duration-base) var(--ease-out), box-shadow var(--duration-base);
+  overflow: hidden;
 }
 .record-tile:hover {
   transform: translateY(-4px);
-  box-shadow: 0 10px 30px rgba(47, 125, 101, 0.1);
+  box-shadow: var(--neu-card-hover);
 }
 
 .tile-header {
-  display: flex; align-items: center; gap: 14px;
+  display: flex; align-items: center; gap: 12px;
   padding: 18px 20px 14px;
-  background: linear-gradient(135deg, #f5fbf7, #edf7f2);
-  border-bottom: 1px solid rgba(47, 125, 101, 0.06);
+  border-bottom: 1px solid var(--card-divider);
 }
 .tile-icon {
-  width: 40px; height: 40px; border-radius: 12px;
-  background: rgba(47, 125, 101, 0.1); color: #2f7d65;
+  width: 42px; height: 42px; border-radius: var(--radius-lg);
+  background: var(--orange-bg-subtle);
+  box-shadow: var(--neu-inset);
+  color: var(--orange-accent);
   display: flex; align-items: center; justify-content: center;
-  font-size: 16px; flex-shrink: 0;
+  font-size: var(--text-lg); flex-shrink: 0;
 }
+.tile-name-wrap { overflow: hidden; }
 .tile-name {
-  font-size: 15px; font-weight: 700; color: #1a2e1a;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
 }
+.tile-subname { font-size: var(--text-xs); color: var(--neutral-700); font-weight: var(--weight-medium); margin-top: 1px; }
 
 .tile-details { padding: 14px 20px; display: flex; flex-direction: column; gap: 8px; }
-.tile-row {
-  display: flex; align-items: center; gap: 10px;
-  font-size: 13px; color: #475569;
-}
-.tile-row i { color: #94a3b8; font-size: 12px; width: 14px; text-align: center; }
-.tile-pan { font-family: monospace; font-weight: 600; color: #2a3a2a; }
+.tile-row { display: flex; align-items: center; gap: 8px; font-size: var(--text-xs); color: var(--text-primary); }
+.tile-row i { color: var(--orange-accent); font-size: var(--text-xs); width: 14px; text-align: center; }
+.tile-label { color: var(--neutral-700); font-weight: var(--weight-bold); }
+.tile-pan { font-family: monospace; font-weight: var(--weight-bold); color: var(--text-primary); }
 
 .tile-footer {
-  padding: 12px 20px; border-top: 1px solid #f0f5f1;
-  display: flex; flex-direction: column; gap: 6px;
+  padding: 12px 20px; border-top: 1px solid var(--card-divider);
+  background: var(--bg-base); display: flex; flex-direction: column; gap: 4px;
 }
 .tile-meta { display: flex; justify-content: space-between; align-items: center; }
 .tile-badge {
-  background: rgba(47, 125, 101, 0.08); color: #2f7d65; border-radius: 8px;
-  padding: 3px 9px; font-size: 11px; font-weight: 700; font-family: monospace;
-  border: 1px solid rgba(47, 125, 101, 0.1);
+  background: var(--neutral-100); border: 1px solid var(--neutral-200);
+  color: var(--neutral-700); border-radius: var(--radius-xs);
+  padding: 2px 8px; font-size: 11px; font-weight: var(--weight-bold); font-family: monospace;
 }
-.tile-date { font-size: 11px; color: #94a3b8; font-weight: 500; }
-.tile-creator {
-  font-size: 12px; color: #64748b; display: flex; align-items: center; gap: 6px;
-}
+.tile-date { font-size: 11px; color: var(--neutral-700); font-weight: var(--weight-semibold); }
+.tile-creator { font-size: 11px; color: var(--neutral-700); font-weight: var(--weight-semibold); display: flex; align-items: center; gap: 6px; }
+.tile-creator i { color: var(--orange-accent); }
 
 .tile-actions {
-  display: flex; gap: 6px; padding: 12px 20px; border-top: 1px solid #f0f5f1;
+  display: flex; gap: 8px; padding: 10px 20px; border-top: 1px solid var(--card-divider);
+  background: var(--bg-base);
 }
 
-.loading-state {
-  display: flex; align-items: center; justify-content: center;
-  padding: 60px 20px; color: #2f7d65; gap: 12px; font-size: 15px;
-}
-.empty-state {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  padding: 80px 20px; color: #94a3b8; gap: 16px;
-}
-.empty-state i { font-size: 40px; opacity: 0.4; }
-
-/* ─── Action buttons ─────────────────────────────────────────── */
 .icon-action {
-  width: 30px; height: 30px; border-radius: 8px; border: none;
-  cursor: pointer; font-size: 12px; display: flex; align-items: center;
-  justify-content: center; transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+  width: 32px; height: 32px; border-radius: var(--radius-md); border: none;
+  cursor: pointer; font-size: var(--text-xs); display: flex; align-items: center;
+  justify-content: center; transition: all var(--duration-fast);
+  background: var(--bg-base); box-shadow: var(--sku-btn-secondary-shadow);
+  color: var(--text-secondary);
 }
-.icon-action:hover { transform: scale(1.12); }
-.icon-action.view { background: rgba(61, 90, 128, 0.08); color: #3d5a80; }
-.icon-action.view:hover { background: #3d5a80; color: white; box-shadow: 0 4px 10px rgba(61, 90, 128, 0.2); }
-.icon-action.edit { background: rgba(47, 125, 101, 0.08); color: #2f7d65; }
-.icon-action.edit:hover { background: #2f7d65; color: white; box-shadow: 0 4px 10px rgba(47, 125, 101, 0.2); }
-.icon-action.assign { background: #fef3e2; color: #d97706; }
-.icon-action.assign:hover { background: #d97706; color: white; box-shadow: 0 4px 10px rgba(217, 119, 6, 0.2); }
-.icon-action.delete { background: #fee2e2; color: #dc2626; }
-.icon-action.delete:hover { background: #dc2626; color: white; box-shadow: 0 4px 10px rgba(220, 38, 38, 0.2); }
+.icon-action:hover {
+  transform: translateY(-1px);
+  color: var(--orange-accent);
+  box-shadow: var(--sku-btn-secondary-shadow-hover);
+}
+.icon-action.delete:hover { color: var(--error-600); }
 
-/* ─── Pagination ─────────────────────────────────────────────── */
-.pagination { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 14px; }
+.viewer-restriction-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  color: #991b1b;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  font-size: 11.5px;
+  line-height: 1.4;
+  margin-top: 10px;
+}
+.viewer-restriction-warning i {
+  font-size: 16px;
+  color: #dc2626;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.viewer-restriction-warning p {
+  margin: 2px 0 0;
+  font-weight: 500;
+}
+
+.loading-state, .empty-state {
+  text-align: center; padding: 48px 24px; color: var(--text-muted);
+  font-size: var(--text-sm); display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+.empty-state i { font-size: 32px; color: var(--neutral-400); }
+
+/* Pagination */
+.pagination { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 12px; }
 .page-btn {
-  width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid #ddd;
-  background: white; cursor: pointer; font-size: 12px;
-  display: flex; align-items: center; justify-content: center;
-  transition: all 0.2s;
+  width: 34px; height: 34px; border-radius: 50%; border: none;
+  background: var(--bg-base); box-shadow: var(--sku-btn-secondary-shadow);
+  cursor: pointer; font-size: var(--text-xs); display: flex; align-items: center;
+  justify-content: center; transition: all var(--duration-fast); color: var(--text-secondary);
 }
-.page-btn:hover:not(:disabled) { border-color: #2f7d65; color: #2f7d65; }
-.page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-.page-info { font-size: 13px; color: #666; }
+.page-btn:hover:not(:disabled) { color: var(--orange-accent); box-shadow: var(--sku-btn-secondary-shadow-hover); }
+.page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.page-info { font-size: var(--text-xs); color: var(--text-secondary); font-weight: var(--weight-semibold); }
 
-/* ─── Modal ──────────────────────────────────────────────────── */
+/* Modals (Glassmorphism) */
 .modal-overlay {
-  position: fixed; inset: 0; background: rgba(15, 23, 42, 0.4);
-  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 100; animation: fadeIn 0.2s ease;
+  position: fixed; inset: 0; background: var(--overlay-bg);
+  backdrop-filter: var(--glass-blur-sm); display: flex; align-items: center;
+  justify-content: center; z-index: var(--z-modal); padding: 20px;
 }
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
 .modal {
-  background: white; border-radius: 22px; width: 680px; max-width: 95vw;
-  max-height: 90vh; display: flex; flex-direction: column;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.18), 0 0 0 1px rgba(47,125,101,0.08);
-  animation: slideUp 0.25s ease;
+  background: var(--bg-base); border-radius: var(--radius-2xl);
+  width: 100%; max-width: 640px; max-height: 90vh; display: flex;
+  flex-direction: column; box-shadow: var(--neu-card-hover);
+  border: none; overflow: hidden;
+  animation: modalIn 0.3s var(--ease-spring);
 }
-.modal-sm { width: 420px; }
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.confirm-modal { width: 420px; }
-.confirm-modal .modal-body { padding: 30px 26px; text-align: center; color: #475569; font-size: 14px; }
-.confirm-btn { background: #dc2626; }
-.confirm-btn:hover { background: #b91c1c; }
+.modal-sm { max-width: 420px; }
+.confirm-modal { max-width: 400px; }
+
 .modal-header {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 22px 26px 18px; border-bottom: 1px solid #eee;
+  padding: 18px 24px; border-bottom: 1px solid var(--card-divider);
 }
-.modal-header h2 { font-size: 17px; font-weight: 700; color: #1a2e1a; margin: 0; }
+.modal-title-group { display: flex; align-items: center; gap: 10px; }
+.modal-icon-wrap {
+  width: 36px; height: 36px; border-radius: var(--radius-md);
+  background: var(--orange-bg-subtle); color: var(--orange-accent);
+  display: flex; align-items: center; justify-content: center; font-size: var(--text-base);
+}
+.modal-icon-wrap.error { background: var(--error-bg); color: var(--error-600); }
+.modal-header h2 { font-size: var(--text-lg); font-weight: var(--weight-bold); color: var(--text-primary); margin: 0; }
+
 .modal-close {
-  width: 32px; height: 32px; border-radius: 50%; background: #f3f3f3;
-  border: none; cursor: pointer; font-size: 13px; color: #666;
-  transition: background 0.2s;
+  width: 32px; height: 32px; border-radius: 50%; background: transparent;
+  border: none; cursor: pointer; font-size: var(--text-xs); color: var(--text-muted);
+  transition: all var(--duration-fast); display: flex; align-items: center; justify-content: center;
 }
-.modal-close:hover { background: #ddd; }
-.modal-body { padding: 20px 26px; overflow-y: auto; flex: 1; }
+.modal-close:hover { background: var(--bg-app); color: var(--text-primary); }
+
+.modal-body { padding: 20px 24px; overflow-y: auto; flex: 1; }
 .modal-footer {
   display: flex; justify-content: flex-end; gap: 10px;
-  padding: 16px 26px 22px; border-top: 1px solid #eee;
+  padding: 16px 24px; border-top: 1px solid var(--card-divider); background: var(--bg-app);
 }
 
-/* ─── Form ───────────────────────────────────────────────────── */
+/* Forms */
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .form-group { display: flex; flex-direction: column; gap: 6px; }
 .form-group.full-width { grid-column: 1 / -1; }
-.form-group label { font-size: 12px; font-weight: 600; color: #5a8a6a; }
-.form-group input,
-.form-group select,
-.form-group textarea {
-  padding: 10px 14px; border-radius: 10px;
-  border: 1.5px solid #e0e0e0; font-size: 13px; outline: none;
-  transition: border-color 0.2s; resize: vertical;
-}
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus { border-color: #2f7d65; }
+.form-group label { font-size: var(--text-xs); font-weight: var(--weight-semibold); color: var(--text-primary); }
 
-.error-msg { color: #dc2626; font-size: 12px; margin-top: 8px; }
+.form-group input, .form-group select, .form-group textarea {
+  padding: 10px 14px; border-radius: var(--radius-md);
+  border: 1px solid rgba(166, 169, 173, 0.55); background: var(--bg-input);
+  box-shadow: var(--neu-inset); font-size: var(--text-xs); font-weight: var(--weight-semibold); outline: none;
+  transition: all var(--duration-fast); color: var(--text-primary);
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+  border-color: var(--orange-accent);
+  box-shadow: inset 0 2px 4px rgba(35, 28, 20, 0.08), 0 0 0 3px var(--orange-glow), 0 1px 0 rgba(255, 255, 255, 0.8);
+  background: var(--bg-input-focus);
+}
+.disabled-input { opacity: 0.65; cursor: not-allowed; background: rgba(224, 216, 204, 0.6) !important; }
 
-.position-relative { position: relative; }
-.dropdown-list {
-  position: absolute; top: 100%; left: 0; right: 0;
-  background: white; border: 1.5px solid #e0e0e0; border-radius: 10px;
-  max-height: 150px; overflow-y: auto; z-index: 10; margin-top: 4px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+.error-msg { color: var(--error-600); font-size: var(--text-xs); margin-top: 8px; font-weight: var(--weight-semibold); }
+
+.search-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
 }
-.dropdown-item {
-  padding: 10px 14px; font-size: 13px; cursor: pointer; color: #333;
+.search-input-wrap input {
+  width: 100%;
+  padding-right: 36px;
 }
-.dropdown-item:hover { background: #f5fbf7; }
-.dropdown-user-info { display: flex; flex-direction: column; gap: 2px; }
-.dropdown-user-name { font-weight: 600; color: #1a2e1a; }
-.dropdown-user-id { font-size: 11px; color: #7a9a7a; font-family: monospace; }
+.search-clear-btn {
+  position: absolute;
+  right: 10px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+}
+.search-clear-btn:hover {
+  background: var(--bg-app);
+  color: var(--text-primary);
+}
+
+.selected-user-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+  margin-top: 4px;
+}
+.selected-user-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.selected-user-left i {
+  font-size: 20px;
+}
+.selected-name {
+  font-weight: var(--weight-bold);
+  font-size: var(--text-xs);
+  color: var(--text-primary);
+}
+.selected-id {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: monospace;
+}
+.btn-xs {
+  padding: 4px 10px !important;
+  font-size: 11px !important;
+}
+
+.search-results-box {
+  background: var(--bg-input);
+  border: 1px solid rgba(166, 169, 173, 0.45);
+  border-radius: var(--radius-md);
+  box-shadow: var(--neu-inset);
+  max-height: 220px;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+.search-results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--bg-app);
+  border-bottom: 1px solid var(--neutral-200);
+  font-size: 11px;
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+}
+.search-results-header small {
+  color: var(--text-muted);
+  font-weight: normal;
+}
+.search-result-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--card-divider);
+  transition: background var(--duration-fast);
+}
+.search-result-item:last-child {
+  border-bottom: none;
+}
+.search-result-item:hover {
+  background: var(--orange-bg-subtle);
+}
+.dropdown-user-name {
+  font-weight: var(--weight-bold);
+  font-size: var(--text-xs);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.user-role-badge {
+  background: var(--bg-app);
+  border: 1px solid var(--neutral-200);
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-weight: var(--weight-semibold);
+}
+.dropdown-user-id {
+  font-size: 11px;
+  color: var(--orange-accent);
+  font-family: monospace;
+  margin-top: 2px;
+}
+.btn-select-user {
+  background: var(--bg-base);
+  border: 1px solid var(--neutral-200);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  cursor: pointer;
+  box-shadow: var(--sku-btn-secondary-shadow);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.search-result-item:hover .btn-select-user {
+  background: var(--orange-gradient);
+  color: white;
+  border-color: transparent;
+  box-shadow: var(--sku-btn-primary-shadow);
+}
+.search-no-results {
+  padding: 20px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-xs);
+}
+.search-no-results i {
+  font-size: 24px;
+  color: var(--neutral-300);
+}
+
+/* Buttons (Skeuomorphism) */
+.btn-primary {
+  background: var(--orange-gradient); color: white; border: none;
+  padding: 10px 18px; border-radius: var(--radius-pill); font-size: var(--text-xs);
+  font-weight: var(--weight-bold); cursor: pointer; display: inline-flex;
+  align-items: center; gap: 6px; transition: all var(--duration-base) var(--ease-out);
+  box-shadow: var(--sku-btn-primary-shadow);
+}
+.btn-primary:hover:not(:disabled) { box-shadow: var(--sku-btn-primary-shadow-hover); transform: translateY(-1px); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-ghost {
+  background: var(--bg-base); color: var(--text-secondary); border: none;
+  padding: 8px 16px; border-radius: var(--radius-pill); font-size: var(--text-xs);
+  font-weight: var(--weight-bold); cursor: pointer; transition: all var(--duration-base) var(--ease-out);
+  box-shadow: var(--sku-btn-secondary-shadow);
+}
+.btn-ghost:hover { color: var(--orange-accent); box-shadow: var(--sku-btn-secondary-shadow-hover); }
+
+.btn-danger {
+  background: var(--error-600); color: white; border: none;
+  padding: 10px 18px; border-radius: var(--radius-pill); font-size: var(--text-xs);
+  font-weight: var(--weight-bold); cursor: pointer; transition: all var(--duration-base);
+}
+.btn-danger:hover { background: var(--error-700); }
+
+@keyframes modalIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+@media (max-width: 640px) { .form-grid { grid-template-columns: 1fr; } .stats-row { grid-template-columns: 1fr; } }
 </style>

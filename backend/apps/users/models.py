@@ -9,6 +9,7 @@ class UserRole(models.TextChoices):
     ADMIN = 'ADMIN', 'Administrator'
     COLLABORATOR = 'COLLABORATOR', 'Collaborator'
     VIEWER = 'VIEWER', 'Viewer'
+    COMPLIANCE_OFFICER = 'COMPLIANCE_OFFICER', 'Compliance Officer'
 
 
 # -------------------------------

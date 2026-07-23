@@ -25,3 +25,23 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(f'Successfully created admin account: {admin_email}'))
         else:
             self.stdout.write(self.style.SUCCESS(f'Admin account {admin_email} already exists.'))
+
+        # Seed Compliance Officer
+        comp_email = os.getenv('COMPLIANCE_EMAIL')
+        comp_password = os.getenv('COMPLIANCE_PASSWORD')
+        comp_name = os.getenv('COMPLIANCE_NAME', 'Compliance Officer')
+
+        if comp_email and comp_password:
+            if not User.objects.filter(email=comp_email).exists():
+                self.stdout.write(f'Creating compliance officer: {comp_email}...')
+                User.objects.create_user(
+                    email=comp_email,
+                    name=comp_name,
+                    password=comp_password,
+                    role=UserRole.COMPLIANCE_OFFICER,
+                    is_active=True
+                )
+                self.stdout.write(self.style.SUCCESS(f'Successfully created compliance officer account: {comp_email}'))
+            else:
+                self.stdout.write(self.style.SUCCESS(f'Compliance officer account {comp_email} already exists.'))
+

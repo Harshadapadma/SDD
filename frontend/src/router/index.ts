@@ -13,6 +13,7 @@ import AdminRecords      from "../views/admin/AdminRecords.vue";
 import AdminUsers        from "../views/admin/AdminUsers.vue";
 import AdminRequests     from "../views/admin/AdminRequests.vue";
 import AdminNotifications from "../views/admin/AdminNotifications.vue";
+import AuditLog          from "../views/admin/AuditLog.vue";
 
 // User pages
 import UserDashboard      from "../views/user/UserDashboard.vue";
@@ -21,6 +22,7 @@ import UserRequests       from "../views/user/UserRequests.vue";
 import UserProfile        from "../views/user/UserProfile.vue";
 import AdminProfile       from "../views/admin/AdminProfile.vue";
 import RecordDetailView   from "../views/RecordDetailView.vue";
+import UserClarifications from "../views/user/UserClarifications.vue";
 
 const getUser = () => {
   const raw = localStorage.getItem("user");
@@ -42,7 +44,7 @@ const routes = [
     component: {
       render() {
         const user = getUser();
-        return user?.role === "ADMIN" ? h(AdminLayout) : h(UserLayout);
+        return (user?.role === "ADMIN" || user?.role === "COMPLIANCE_OFFICER") ? h(AdminLayout) : h(UserLayout);
       },
     },
     meta: { requiresAuth: true },
@@ -52,7 +54,8 @@ const routes = [
         component: {
           render() {
             const u = getUser();
-            return u?.role === "ADMIN" ? h(AdminDashboard) : h(UserDashboard);
+            if (u?.role === "ADMIN") return h(AdminUsers);
+            return u?.role === "COMPLIANCE_OFFICER" ? h(AdminDashboard) : h(UserDashboard);
           }
         } 
       },
@@ -61,7 +64,8 @@ const routes = [
         component: {
           render() {
             const u = getUser();
-            return u?.role === "ADMIN" ? h(AdminRecords) : h(UserRecords);
+            if (u?.role === "ADMIN") return h('div', { style: 'padding: 24px; text-align: center; color: #ef4444; font-weight: bold;' }, 'Unauthorized: Admin role cannot access records');
+            return u?.role === "COMPLIANCE_OFFICER" ? h(AdminRecords) : h(UserRecords);
           }
         } 
       },
@@ -70,7 +74,8 @@ const routes = [
         component: {
           render() {
             const u = getUser();
-            return u?.role === "ADMIN" ? h(AdminRequests) : h(UserRequests);
+            if (u?.role === "ADMIN") return h('div', { style: 'padding: 24px; text-align: center; color: #ef4444; font-weight: bold;' }, 'Unauthorized: Admin role cannot access requests');
+            return u?.role === "COMPLIANCE_OFFICER" ? h(AdminRequests) : h(UserRequests);
           }
         } 
       },
@@ -79,35 +84,51 @@ const routes = [
         component: {
           render() {
             const u = getUser();
-            return u?.role === "ADMIN" ? h(AdminProfile) : h(UserProfile);
+            return (u?.role === "ADMIN" || u?.role === "COMPLIANCE_OFFICER") ? h(AdminProfile) : h(UserProfile);
           }
         }
       },
       {
         path: "records/:id",
-        component: RecordDetailView
+        component: {
+          render() {
+            const u = getUser();
+            if (u?.role === "ADMIN") return h('div', { style: 'padding: 24px; text-align: center; color: #ef4444; font-weight: bold;' }, 'Unauthorized: Admin role cannot access records');
+            return h(RecordDetailView);
+          }
+        }
       },
       { 
         path: "users",     
         component: {
           render() {
             const u = getUser();
-            return u?.role === "ADMIN" ? h(AdminUsers) : h('div', 'Unauthorized');
-          }
-        }
-      },
-      { 
-        path: "requests",  
-        component: {
-          render() {
-            const u = getUser();
-            return u?.role === "ADMIN" ? h(AdminRequests) : h('div', 'Unauthorized');
+            return (u?.role === "ADMIN" || u?.role === "COMPLIANCE_OFFICER") ? h(AdminUsers) : h('div', { style: 'padding: 24px; text-align: center; color: #ef4444; font-weight: bold;' }, 'Unauthorized: Only Admin or Compliance Officer can access users');
           }
         }
       },
       { 
         path: "notifications", 
         component: AdminNotifications // Shared for now, or adapt later
+      },
+      {
+        path: "audit-log",
+        component: {
+          render() {
+            const u = getUser();
+            return u?.role === "COMPLIANCE_OFFICER" ? h(AuditLog) : h('div', { style: 'padding: 24px; text-align: center; color: #ef4444; font-weight: bold;' }, 'Unauthorized');
+          }
+        }
+      },
+      {
+        path: "clarifications",
+        component: {
+          render() {
+            const u = getUser();
+            if (u?.role === "ADMIN") return h('div', { style: 'padding: 24px; text-align: center; color: #ef4444; font-weight: bold;' }, 'Unauthorized');
+            return h(UserClarifications);
+          }
+        }
       },
     ],
   },

@@ -87,42 +87,64 @@ const handleSetPassword = async () => {
 
 <template>
   <div class="setup-container">
-    <div class="setup-box">
+    <div class="glow-bg"></div>
+
+    <div class="setup-card">
       <div class="brand">
-        <i class="fas fa-shield-halved"></i> Negen Vault
+        <i class="fas fa-shield-halved"></i>
+        <span>Negen SDD</span>
       </div>
 
       <!-- USER INFO CARD -->
       <div class="user-info-card" v-if="userData">
-        <div class="avatar-sm">
-          <i class="fas fa-user"></i>
+        <div class="avatar-wrapper">
+          <div class="avatar-sm">
+            {{ userData.name?.charAt(0)?.toUpperCase() || 'U' }}
+          </div>
+          <div class="verified-dot" title="Verified Account">
+            <i class="fas fa-check"></i>
+          </div>
         </div>
         <div class="info-content">
-          <h3>{{ userData.name }}</h3>
-          <p>{{ userData.email }}</p>
-          <span class="id-tag">{{ userData.public_id }}</span>
+          <div class="card-top-row">
+            <span class="user-name">{{ userData.name }}</span>
+            <span class="identity-badge">VERIFIED USER</span>
+          </div>
+          <div class="user-email">{{ userData.email }}</div>
+          <div class="id-row">
+            <span class="id-label">ID</span>
+            <span class="id-tag">{{ userData.public_id }}</span>
+          </div>
         </div>
       </div>
 
-      <h2>Setup Account</h2>
-      <p class="subtext">Choose a secure password to activate your access to Negen SDD Portal.</p>
+      <div class="header">
+        <h2>Setup Your Account</h2>
+        <p class="subtext">Create a strong password to activate your portal access.</p>
+      </div>
 
-      <div v-if="successMsg" class="alert success">
-        <i class="fas fa-check-circle"></i> {{ successMsg }}
-      </div>
+      <Transition name="fade">
+        <div v-if="successMsg" class="alert success">
+          <i class="fas fa-circle-check"></i> {{ successMsg }}
+        </div>
+      </Transition>
       
-      <div v-if="errorMsg" class="alert error">
-        <i class="fas fa-exclamation-circle"></i> {{ errorMsg }}
-      </div>
+      <Transition name="fade">
+        <div v-if="errorMsg" class="alert error">
+          <i class="fas fa-circle-exclamation"></i> {{ errorMsg }}
+        </div>
+      </Transition>
 
       <!-- PASSWORD FIELD -->
       <div class="form-group">
-        <label>New Password</label>
+        <label for="newPass">New Password</label>
         <div class="input-wrap">
+          <i class="fas fa-lock input-icon"></i>
           <input 
+            id="newPass"
             v-model="password" 
             :type="showPassword ? 'text' : 'password'" 
-            placeholder="e.g. MyPass@123" 
+            placeholder="Enter new password" 
             :disabled="!!successMsg || loading || !userData"
           />
           <button class="peek-btn" @click="showPassword = !showPassword" type="button" tabindex="-1">
@@ -132,7 +154,7 @@ const handleSetPassword = async () => {
         <!-- PASSWORD RULES -->
         <ul class="pass-rules" v-if="password">
           <li v-for="(rule, i) in passRules" :key="i" :class="{ met: rule.met }">
-            <i :class="['fas', rule.met ? 'fa-check-circle' : 'fa-times-circle']"></i>
+            <i :class="['fas', rule.met ? 'fa-circle-check' : 'fa-circle-xmark']"></i>
             {{ rule.label }}
           </li>
         </ul>
@@ -140,12 +162,14 @@ const handleSetPassword = async () => {
 
       <!-- CONFIRM FIELD -->
       <div class="form-group">
-        <label>Confirm Password</label>
+        <label for="confirmPass">Confirm Password</label>
         <div class="input-wrap">
+          <i class="fas fa-shield-cat input-icon"></i>
           <input 
+            id="confirmPass"
             v-model="confirmPassword" 
             :type="showConfirmPassword ? 'text' : 'password'" 
-            placeholder="Repeat password" 
+            placeholder="Repeat new password" 
             :disabled="!!successMsg || loading || !userData"
           />
           <button class="peek-btn" @click="showConfirmPassword = !showConfirmPassword" type="button" tabindex="-1">
@@ -154,9 +178,9 @@ const handleSetPassword = async () => {
         </div>
       </div>
 
-      <button class="submit-btn" @click="handleSetPassword" :disabled="!!successMsg || loading || !userData">
+      <button class="submit-btn" @click="handleSetPassword" :disabled="!!successMsg || loading || !userData || !allRulesMet">
         <i class="fas fa-spinner fa-spin" v-if="loading"></i>
-        {{ loading ? 'Saving...' : 'Activate Account' }}
+        <span>{{ loading ? 'Saving Password...' : 'Activate Account' }}</span>
       </button>
     </div>
   </div>
@@ -164,84 +188,304 @@ const handleSetPassword = async () => {
 
 <style scoped>
 .setup-container {
-  height: 100vh; display: flex; align-items: center; justify-content: center;
-  background: #f1f5f9; padding: 20px;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--neutral-900);
+  font-family: var(--font-family);
+  position: relative;
+  overflow: hidden;
+  padding: 20px;
 }
 
-.setup-box {
-  width: 100%; max-width: 440px; padding: 40px; background: white;
-  border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.04);
-  display: flex; flex-direction: column;
+.glow-bg {
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--orange-glow) 0%, transparent 70%);
+  top: -150px;
+  left: -150px;
+  pointer-events: none;
+}
+
+.setup-card {
+  width: 100%;
+  max-width: 440px;
+  padding: 40px;
+  background: var(--bg-card);
+  border-radius: var(--radius-3xl);
+  box-shadow: var(--glass-shadow-lg);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  z-index: var(--z-raised);
+  animation: cardEntrance 0.5s var(--ease-spring);
 }
 
 .brand {
-  display: flex; align-items: center; justify-content: center; gap: 10px;
-  font-size: 20px; font-weight: 800; color: #3d5a80; margin-bottom: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-extrabold);
+  color: var(--orange-accent);
+  margin-bottom: 24px;
 }
 
-/* ─── User Info Card ────────────────────────────────────────── */
+/* User Info Card */
 .user-info-card {
-  display: flex; align-items: center; gap: 16px; background: #f8fafc;
-  border: 1.5px solid #e2e8f0; border-radius: 16px; padding: 16px;
-  margin-bottom: 30px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: linear-gradient(135deg, rgba(234, 108, 0, 0.07) 0%, rgba(249, 248, 245, 0.95) 100%);
+  border: 1px solid rgba(234, 108, 0, 0.25);
+  border-radius: var(--radius-xl);
+  padding: 16px 18px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 16px rgba(35, 28, 20, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  position: relative;
+  overflow: hidden;
 }
+
+.user-info-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: var(--orange-gradient);
+  border-radius: var(--radius-pill) 0 0 var(--radius-pill);
+}
+
+.avatar-wrapper {
+  position: relative;
+}
+
 .avatar-sm {
-  width: 44px; height: 44px; border-radius: 50%; background: #e0f2fe;
-  color: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 18px;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--orange-gradient);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: var(--weight-extrabold);
+  font-size: var(--text-md);
+  box-shadow: 0 4px 12px rgba(234, 108, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  border: 2px solid #ffffff;
 }
-.info-content h3 { font-size: 15px; font-weight: 700; color: #1e293b; margin: 0; }
-.info-content p { font-size: 12px; color: #64748b; margin: 2px 0 6px; }
+
+.verified-dot {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 16px;
+  height: 16px;
+  background: #16a34a;
+  color: white;
+  border-radius: 50%;
+  font-size: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+}
+
+.info-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.card-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.user-name {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.3px;
+  line-height: 1.2;
+}
+
+.identity-badge {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  color: var(--orange-700);
+  background: rgba(234, 108, 0, 0.12);
+  border: 1px solid rgba(234, 108, 0, 0.3);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  text-transform: uppercase;
+}
+
+.user-email {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: var(--weight-medium);
+}
+
+.id-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.id-label {
+  font-size: 9px;
+  font-weight: 800;
+  color: var(--neutral-400);
+  letter-spacing: 1px;
+}
+
 .id-tag {
-  background: #fff; border: 1px solid #e2e8f0; padding: 2px 8px;
-  border-radius: 6px; font-size: 10px; font-weight: 700; color: #3d5a80; font-family: monospace;
+  font-family: 'Courier New', Consolas, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--neutral-800);
+  background: rgba(35, 28, 20, 0.06);
+  border: 1px solid rgba(35, 28, 20, 0.08);
+  padding: 2px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
 }
 
-h2 { font-size: 24px; color: #1e293b; margin: 0 0 8px 0; text-align: center; font-weight: 800; }
-.subtext { font-size: 14px; color: #64748b; text-align: center; margin: 0 0 24px 0; line-height: 1.6; }
+/* Forms */
+.pass-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
 
-.form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
-.form-group label { font-size: 13px; font-weight: 700; color: #475569; }
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.form-group label {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+}
 
-.input-wrap { position: relative; display: flex; align-items: center; }
+.input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.input-icon {
+  position: absolute;
+  left: 14px;
+  color: var(--neutral-400);
+  font-size: var(--text-sm);
+  pointer-events: none;
+}
 .input-wrap input {
-  width: 100%; padding: 14px 44px 14px 16px; border: 2px solid #f1f5f9;
-  border-radius: 12px; font-size: 15px; outline: none; transition: all 0.2s;
-  color: #1e293b; background: #f8fafc;
+  width: 100%;
+  padding: 12px 42px 12px 40px;
+  border: 1px solid rgba(166, 169, 173, 0.55);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  background: var(--bg-input);
+  box-shadow: var(--neu-inset);
+  transition: all var(--duration-fast);
 }
-.input-wrap input:focus { border-color: #3d5a80; background: white; box-shadow: 0 0 0 4px rgba(61, 90, 128, 0.05); }
+.input-wrap input:focus {
+  outline: none;
+  border-color: var(--orange-accent);
+  box-shadow: inset 0 2px 4px rgba(35, 28, 20, 0.08), 0 0 0 3px var(--orange-glow), 0 1px 0 rgba(255, 255, 255, 0.8);
+  background: var(--bg-input-focus);
+}
 
 .peek-btn {
-  position: absolute; right: 12px; background: none; border: none;
-  color: #94a3b8; cursor: pointer; font-size: 16px; padding: 4px;
-  transition: color 0.2s;
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  color: var(--neutral-400);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  padding: 8px;
+  transition: color var(--duration-fast);
 }
-.peek-btn:hover { color: #3d5a80; }
+.peek-btn:hover { color: var(--orange-accent); }
 
 .submit-btn {
-  margin-top: 10px; padding: 16px; background: #3d5a80; color: white;
-  border: none; border-radius: 12px; cursor: pointer; font-weight: 700;
-  font-size: 16px; transition: all 0.2s; display: flex; align-items: center;
-  justify-content: center; gap: 10px;
+  margin-top: 8px;
+  padding: 13px;
+  background: var(--orange-gradient);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-weight: var(--weight-bold);
+  font-size: var(--text-sm);
+  transition: all var(--duration-base) var(--ease-out);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: var(--sku-btn-primary-shadow);
 }
-.submit-btn:hover:not(:disabled) { background: #293241; transform: translateY(-1px); }
-.submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.submit-btn:hover:not(:disabled) {
+  box-shadow: var(--sku-btn-primary-shadow-hover);
+  transform: translateY(-1px);
+}
+.submit-btn:active:not(:disabled) {
+  box-shadow: var(--sku-btn-primary-shadow-active);
+  transform: translateY(1px);
+}
+.submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .alert {
-  padding: 14px 18px; border-radius: 12px; font-size: 14px;
-  font-weight: 600; margin-bottom: 24px; display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
-.alert.error { background: #fff1f2; color: #e11d48; border: 1.5px solid #ffe4e6; }
-.alert.success { background: #f0fdf4; color: #16a34a; border: 1.5px solid #dcfce7; }
+.alert.success {
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+  color: var(--success-700);
+}
+.alert.error {
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
+  color: var(--error-700);
+}
 
-/* ─── Password Rules Checklist ──────────────────────────────── */
 .pass-rules {
-  list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-direction: column; gap: 6px;
+  list-style: none; padding: 0; margin: 6px 0 0; display: flex; flex-direction: column; gap: 4px;
 }
 .pass-rules li {
-  font-size: 12px; font-weight: 600; color: #e11d48;
-  display: flex; align-items: center; gap: 8px;
-  transition: color 0.25s ease;
+  font-size: 11px; font-weight: var(--weight-medium); color: var(--neutral-400);
+  display: flex; align-items: center; gap: 6px;
+  transition: color var(--duration-fast);
 }
-.pass-rules li.met { color: #16a34a; }
-.pass-rules li i { font-size: 13px; width: 16px; text-align: center; }
+.pass-rules li.met { color: var(--success-600); }
+
+@keyframes cardEntrance {
+  from { opacity: 0; transform: translateY(20px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>

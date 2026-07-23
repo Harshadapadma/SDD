@@ -4,18 +4,20 @@
     <!-- PAGE HEADER -->
     <div class="page-header">
       <div>
-        <h1 class="page-title">Users</h1>
-        <p class="page-sub">Manage system users and their roles</p>
+        <h1 class="page-title">User Management</h1>
+        <p class="page-sub">Provision accounts, manage permissions, and track profile status</p>
       </div>
-      <button class="btn-primary" @click="showCreate = true">
+      <button class="btn-primary" v-if="currentUser?.role === 'ADMIN'" @click="showCreate = true">
         <i class="fas fa-user-plus"></i> Add User
       </button>
     </div>
 
-    <!-- STATS ROW -->
+    <!-- STATS ROW (Neomorphism) -->
     <div class="stats-row">
       <div class="stat-card" v-for="s in stats" :key="s.label">
-        <i :class="['fas', s.icon, 'stat-icon', s.color]"></i>
+        <div :class="['stat-icon-wrap', s.color]">
+          <i :class="['fas', s.icon]"></i>
+        </div>
         <div>
           <div class="stat-val">{{ s.val }}</div>
           <div class="stat-label">{{ s.label }}</div>
@@ -27,7 +29,7 @@
     <div class="toolbar">
       <div class="search-wrap">
         <i class="fas fa-search search-icon"></i>
-        <input v-model="search" @input="fetchUsers" class="search-input" placeholder="Search by name, email, ID…" />
+        <input v-model="search" @input="fetchUsers" class="search-input" placeholder="Search by name, email, public ID…" />
       </div>
       <div class="filter-dropdown-wrap">
         <button class="filter-btn" @click.stop="showRoleMenu = !showRoleMenu">
@@ -41,8 +43,7 @@
             <div class="menu-header">
               <div class="menu-icon-bg"><i class="fas fa-users-cog"></i></div>
               <div class="menu-info">
-                <div class="menu-title">Filter by Role</div>
-                <div class="menu-sub">{{ total }} total users</div>
+                <div class="menu-title">{{ total }} total users</div>
               </div>
             </div>
             
@@ -55,10 +56,6 @@
             
             <div class="menu-divider"></div>
             
-            <div class="menu-item" :class="{ active: roleFilter === 'ADMIN' }" @click="setRoleFilter('ADMIN')">
-              <i class="fas fa-user-shield"></i>
-              <span>Admin</span>
-            </div>
             <div class="menu-item" :class="{ active: roleFilter === 'COLLABORATOR' }" @click="setRoleFilter('COLLABORATOR')">
               <i class="fas fa-user-friends"></i>
               <span>Collaborator</span>
@@ -74,12 +71,12 @@
 
     <!-- TILE GRID -->
     <div v-if="loading" class="loading-state">
-      <i class="fas fa-spinner fa-spin"></i> Loading users…
+      <i class="fas fa-spinner fa-spin"></i> Loading user accounts…
     </div>
     
     <div v-else-if="users.length === 0" class="empty-state">
       <i class="fas fa-users-slash"></i>
-      <p>No users found.</p>
+      <p>No user accounts found.</p>
     </div>
 
     <div v-else class="tile-grid">
@@ -96,9 +93,7 @@
         <div class="tile-details">
           <div class="tile-row">
             <span class="badge-id">{{ u.public_id }}</span>
-          </div>
-          <div class="tile-row">
-            <div class="status-wrap">
+            <div class="status-wrap ms-auto">
               <span :class="['status-dot', u.is_active ? 'active' : 'inactive']">
                 {{ u.is_active ? 'Active' : 'Inactive' }}
               </span>
@@ -118,7 +113,7 @@
 
         <div class="tile-actions">
           <template v-if="u.role !== 'ADMIN'">
-            <button class="icon-action view" title="View Profile" @click="viewProfile(u)">
+            <button class="icon-action view" title="View Profile Details" @click="viewProfile(u)">
               <i class="fas fa-eye"></i>
             </button>
             <div class="role-toggle">
@@ -139,7 +134,7 @@
               <i :class="['fas', u.is_blacklisted ? 'fa-user-check' : 'fa-user-slash']"></i>
             </button>
           </template>
-          <span v-else class="muted">—</span>
+          <span v-else class="muted font-mono">System Owner</span>
         </div>
       </div>
     </div>
@@ -155,13 +150,16 @@
       </button>
     </div>
 
-    <!-- ─── CONFIRMATION MODAL ────────────────────────────────── -->
+    <!-- ─── CONFIRMATION MODAL (Glassmorphism) ────────────────── -->
     <teleport to="body">
     <div class="modal-overlay" v-if="confirmAction" @click.self="confirmAction = null">
       <div class="modal modal-sm">
         <div class="modal-header">
-          <h2>Confirm Action</h2>
-          <button class="modal-close" @click="confirmAction = null"><i class="fas fa-times"></i></button>
+          <div class="modal-title-group">
+            <div class="modal-icon-wrap"><i class="fas fa-circle-question"></i></div>
+            <h2>Confirm Action</h2>
+          </div>
+          <button class="modal-close" @click="confirmAction = null" aria-label="Close"><i class="fas fa-times"></i></button>
         </div>
         <div class="modal-body">
           <p v-if="confirmAction.type === 'ROLE'">
@@ -182,22 +180,27 @@
         </div>
       </div>
     </div>
+    </teleport>
 
-    <!-- ─── USER DETAIL MODAL ────────────────────────────────── -->
+    <!-- ─── USER DETAIL MODAL (Glassmorphism) ────────────────── -->
+    <teleport to="body">
     <div class="modal-overlay" v-if="selectedUser" @click.self="selectedUser = null">
       <div class="modal modal-md">
         <div class="modal-header">
-          <h2>User Profile Details</h2>
-          <button class="modal-close" @click="selectedUser = null"><i class="fas fa-times"></i></button>
+          <div class="modal-title-group">
+            <div class="modal-icon-wrap"><i class="fas fa-id-card"></i></div>
+            <h2>User Profile Details</h2>
+          </div>
+          <button class="modal-close" @click="selectedUser = null" aria-label="Close"><i class="fas fa-times"></i></button>
         </div>
         <div class="modal-body profile-modal-body">
           <div class="profile-header-wrap">
-            <div class="avatar-circle">{{ selectedUser.name.charAt(0) }}</div>
+            <div class="avatar-circle">{{ selectedUser.name.charAt(0).toUpperCase() }}</div>
             <div class="header-info">
               <h3>{{ selectedUser.name }}</h3>
               <p>{{ selectedUser.email }}</p>
               <span :class="['profile-status-badge', selectedUser.is_profile_complete ? 'complete' : 'incomplete']">
-                {{ selectedUser.is_profile_complete ? 'Complete' : 'Incomplete' }}
+                {{ selectedUser.is_profile_complete ? 'Profile Complete' : 'Profile Incomplete' }}
               </span>
             </div>
           </div>
@@ -208,7 +211,7 @@
               <span class="mono">{{ selectedUser.public_id }}</span>
             </div>
             <div class="detail-item">
-              <label>Role</label>
+              <label>System Role</label>
               <span class="role-pill-sm">{{ selectedUser.role }}</span>
             </div>
             <div class="detail-item">
@@ -225,15 +228,46 @@
             </div>
           </div>
 
+          <!-- ASSIGNED RECORDS & ACCESS PRIVILEGES SECTION -->
+          <div class="user-records-access-section">
+            <div class="section-title">
+              <i class="fas fa-database"></i>
+              <span>Assigned Records &amp; Access Privileges</span>
+              <span class="count-pill" v-if="selectedUser.records_access">{{ selectedUser.records_access.length }}</span>
+            </div>
+            
+            <div class="user-records-list" v-if="selectedUser.records_access && selectedUser.records_access.length > 0">
+              <div class="user-record-card" v-for="rec in selectedUser.records_access" :key="rec.record_id">
+                <div class="rec-main">
+                  <div class="rec-name">{{ rec.record_name }}</div>
+                  <div class="rec-meta">
+                    <span class="rec-id">{{ rec.record_id }}</span> &bull; 
+                    <span>PAN: <strong>{{ rec.pan || '—' }}</strong></span> &bull; 
+                    <span>{{ rec.source_company || '—' }}</span>
+                  </div>
+                </div>
+                <div class="rec-access-badge">
+                  <span :class="['access-pill', rec.access_type.toLowerCase()]">
+                    {{ rec.access_type === 'EDIT' ? 'Full Edit' : 'View Only' }}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div class="user-records-empty" v-else>
+              <i class="fas fa-folder-open"></i>
+              <p>No records assigned to this user yet.</p>
+            </div>
+          </div>
+
           <div class="ping-section" v-if="!selectedUser.is_profile_complete">
             <div class="ping-info">
-              <i class="fas fa-info-circle"></i>
+              <i class="fas fa-circle-info"></i>
               <span>Profile is missing mandatory details.</span>
             </div>
             <button class="btn-ping" @click="pingUser(selectedUser)" :disabled="pinging">
               <i class="fas fa-paper-plane" v-if="!pinging"></i>
               <i class="fas fa-spinner fa-spin" v-else></i>
-              {{ pinging ? 'Pinging...' : 'Remind User to Complete' }}
+              <span>{{ pinging ? 'Sending...' : 'Remind User to Complete' }}</span>
             </button>
           </div>
         </div>
@@ -241,38 +275,49 @@
     </div>
     </teleport>
 
-    <!-- ─── CREATE USER MODAL ────────────────────────────────── -->
+    <!-- ─── CREATE USER MODAL (Glassmorphism) ────────────────── -->
     <teleport to="body">
     <div class="modal-overlay" v-if="showCreate" @click.self="showCreate = false">
       <div class="modal modal-sm">
         <div class="modal-header">
-          <h2>Add New User</h2>
-          <button class="modal-close" @click="showCreate = false"><i class="fas fa-times"></i></button>
+          <div class="modal-title-group">
+            <div class="modal-icon-wrap"><i class="fas fa-user-plus"></i></div>
+            <h2>Add New User</h2>
+          </div>
+          <button class="modal-close" @click="showCreate = false" aria-label="Close"><i class="fas fa-times"></i></button>
         </div>
         <div class="modal-body">
           <div class="form-group">
-            <label>Full Name</label>
-            <input v-model="form.name" placeholder="Jane Smith" />
+            <label>Full Name *</label>
+            <input v-model="form.name" placeholder="e.g. Rahul Sharma" maxlength="255" @input="form.name = form.name.replace(/[^a-zA-Z\s\.\-']/g, '')" />
           </div>
           <div class="form-group">
-            <label>Email</label>
-            <input v-model="form.email" type="email" placeholder="jane@negen.com" />
+            <label>Email Address *</label>
+            <input v-model="form.email" type="email" placeholder="rahul@company.com" maxlength="255" />
           </div>
           <div class="form-group">
-            <label>Role</label>
-            <div class="radio-group">
-              <label>
-                <input type="radio" value="VIEWER" v-model="form.role" />
-                Viewer
-              </label>
-              <label>
-                <input type="radio" value="COLLABORATOR" v-model="form.role" />
-                Collaborator
-              </label>
+            <label>System Role *</label>
+            <div class="role-selector">
+              <button 
+                type="button" 
+                :class="['role-btn-option', { active: form.role === 'VIEWER' }]"
+                @click="form.role = 'VIEWER'"
+              >
+                <i class="fas fa-eye"></i>
+                <div class="role-btn-label">Viewer</div>
+              </button>
+              <button 
+                type="button" 
+                :class="['role-btn-option', { active: form.role === 'COLLABORATOR' }]"
+                @click="form.role = 'COLLABORATOR'"
+              >
+                <i class="fas fa-user-edit"></i>
+                <div class="role-btn-label">Collaborator</div>
+              </button>
             </div>
           </div>
           <div class="alert-box error" v-if="createError">
-            <i class="fas fa-exclamation-circle"></i>
+            <i class="fas fa-circle-exclamation"></i>
             <span>{{ createError }}</span>
           </div>
         </div>
@@ -280,7 +325,7 @@
           <button class="btn-ghost" @click="closeCreate">Cancel</button>
           <button class="btn-primary" @click="createUser" :disabled="creating">
             <i class="fas fa-spinner fa-spin" v-if="creating"></i>
-            {{ creating ? 'Creating…' : 'Create User' }}
+            <span>{{ creating ? 'Creating…' : 'Create User' }}</span>
           </button>
         </div>
       </div>
@@ -296,6 +341,7 @@ import api from '../../api/client'
 import { useNotifications } from '../../composables/useNotifications'
 
 const { notify } = useNotifications()
+const currentUser = computed(() => JSON.parse(localStorage.getItem('user') || '{}'))
 const users = ref<any[]>([])
 const total = ref(0)
 const page = ref(1)
@@ -317,16 +363,33 @@ function setRoleFilter(role: string) {
 }
 
 onMounted(() => {
+  fetchUsers()
   window.addEventListener('click', () => { showRoleMenu.value = false })
 })
 
 const totalPages = computed(() => Math.ceil(total.value / pageSize))
 
+const userStats = ref({
+  total_users: 0,
+  active_users: 0,
+  inactive_users: 0,
+  blacklisted_users: 0
+})
+
+async function fetchUserStats() {
+  try {
+    const res = await api.get('auth/users/stats/')
+    userStats.value = res.data
+  } catch (e) {
+    console.error('Failed to load user stats:', e)
+  }
+}
+
 const stats = computed(() => [
-  { icon: 'fa-users', color: 'green', val: total.value, label: 'Total Users' },
-  { icon: 'fa-user-check', color: 'blue', val: users.value.filter(u => u.is_active).length, label: 'Active' },
-  { icon: 'fa-user-shield', color: 'orange', val: users.value.filter(u => u.role === 'ADMIN').length, label: 'Admins' },
-  { icon: 'fa-user-clock', color: 'red', val: users.value.filter(u => !u.is_active).length, label: 'Inactive' },
+  { icon: 'fa-users', color: 'green', val: userStats.value.total_users, label: 'Total Users' },
+  { icon: 'fa-user-check', color: 'blue', val: userStats.value.active_users, label: 'Active' },
+  { icon: 'fa-user-clock', color: 'red', val: userStats.value.inactive_users, label: 'Inactive' },
+  { icon: 'fa-user-slash', color: 'orange', val: userStats.value.blacklisted_users, label: 'Blacklisted' },
 ])
 
 async function fetchUsers() {
@@ -338,6 +401,7 @@ async function fetchUsers() {
     const res = await api.get('auth/users/', { params })
     users.value = res.data.results
     total.value = res.data.count
+    await fetchUserStats()
   } catch (e) {
     console.error(e)
   } finally {
@@ -394,6 +458,7 @@ async function executeConfirm() {
       await api.put(`auth/users/${user.public_id}/change-role/`, { role: targetRole })
       user.role = targetRole
       notify('Role Updated', `User ${user.name} is now a ${targetRole}.`, 'SUCCESS')
+      fetchUserStats()
     } catch (e) {
       console.error(e)
       notify('Update Failed', 'Failed to change user role.', 'ERROR')
@@ -408,6 +473,7 @@ async function executeConfirm() {
         `${user.name} has been ${user.is_blacklisted ? 'blacklisted' : 'unblacklisted'}.`,
         user.is_blacklisted ? 'WARNING' : 'SUCCESS'
       )
+      fetchUserStats()
     } catch (e) {
       console.error(e)
       notify('Update Failed', 'Failed to update user status.', 'ERROR')
@@ -422,11 +488,27 @@ const createError = ref('')
 const form = ref({ name: '', email: '', role: 'VIEWER' })
 
 async function createUser() {
+  if (!form.value.name || form.value.name.trim().length < 2) {
+    createError.value = 'Full name must be at least 2 characters long.'
+    notify('Validation Error', createError.value, 'WARNING')
+    return
+  }
+  if (!/^[a-zA-Z\s\.\-']+$/.test(form.value.name)) {
+    createError.value = 'Name must contain only letters, spaces, dots, hyphens, and single quotes.'
+    notify('Validation Error', createError.value, 'WARNING')
+    return
+  }
+  const emailRegex = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/;
+  if (!form.value.email || !emailRegex.test(form.value.email)) {
+    createError.value = 'Please enter a valid email address.'
+    notify('Validation Error', createError.value, 'WARNING')
+    return
+  }
   creating.value = true
   createError.value = ''
   try {
     await api.post('auth/create-user/', form.value)
-    notify('User Created', `Successfully added ${form.value.name}. An activation email has been sent.`, 'SUCCESS')
+    notify('User Created', `Successfully added ${form.value.name}. Activation link sent.`, 'SUCCESS')
     showCreate.value = false
     form.value = { name: '', email: '', role: 'VIEWER' }
     fetchUsers()
@@ -448,409 +530,296 @@ async function createUser() {
   }
 }
 
-
 function closeCreate() {
   showCreate.value = false
   createError.value = ''
   form.value = { name: '', email: '', role: 'VIEWER' }
 }
-
-onMounted(fetchUsers)
 </script>
 
 <style scoped>
-.page { display: flex; flex-direction: column; gap: 20px; animation: fadeInUp 0.4s ease both; }
+.page { display: flex; flex-direction: column; gap: 24px; }
 
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(14px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
+.page-header { display: flex; justify-content: space-between; align-items: flex-end; }
+.page-title { font-size: var(--text-2xl); font-weight: var(--weight-extrabold); color: var(--text-primary); }
+.page-sub { font-size: var(--text-xs); color: var(--text-secondary); margin-top: 4px; }
 
-.page-header { display: flex; justify-content: space-between; align-items: flex-start; }
-.page-title  { font-size: 22px; font-weight: 700; color: #1a2e1a; margin: 0; }
-.page-sub    { font-size: 13px; color: #7a9a7a; margin: 4px 0 0; }
-
-/* ─── Stats ─────────────────────────────────────────────────── */
-.stats-row { display: flex; gap: 14px; }
+/* Stats (Neomorphism) */
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
 .stat-card {
-  flex: 1; display: flex; align-items: center; gap: 14px;
-  background: linear-gradient(135deg, #f5fbf7 0%, #ecf5ef 100%);
-  border: 1.5px solid rgba(47, 125, 101, 0.12);
-  border-radius: 16px; padding: 16px 20px;
-  box-shadow: 0 4px 12px rgba(47, 125, 101, 0.04);
-  transition: transform 0.3s cubic-bezier(0.4,0,0.2,1), box-shadow 0.3s ease;
-  position: relative; overflow: hidden;
+  display: flex; align-items: center; gap: 14px;
+  background: var(--bg-base); box-shadow: var(--neu-card);
+  border-radius: var(--radius-xl); padding: 18px 20px;
+  transition: transform var(--duration-base) var(--ease-out);
 }
-.stat-card::before {
-  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.8), transparent);
-}
-.stat-card:nth-child(1) { animation: fadeInUp 0.4s ease 0.05s both; }
-.stat-card:nth-child(2) { animation: fadeInUp 0.4s ease 0.10s both; }
-.stat-card:nth-child(3) { animation: fadeInUp 0.4s ease 0.15s both; }
-.stat-card:nth-child(4) { animation: fadeInUp 0.4s ease 0.20s both; }
-.stat-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 24px rgba(47, 125, 101, 0.1);
-}
-.stat-icon { font-size: 20px; transition: transform 0.2s ease; }
-.stat-card:hover .stat-icon { transform: scale(1.15); }
-.stat-icon.green  { color: #2f7d65; }
-.stat-icon.blue   { color: #3b82f6; }
-.stat-icon.orange { color: #f59e0b; }
-.stat-icon.red    { color: #ef4444; }
-.stat-val   { font-size: 22px; font-weight: 700; color: #1a2e1a; }
-.stat-label { font-size: 12px; color: #7a9a7a; }
+.stat-card:hover { transform: translateY(-2px); box-shadow: var(--neu-card-hover); }
 
-/* ─── Toolbar ────────────────────────────────────────────────── */
-.toolbar { display: flex; gap: 12px; align-items: center; }
-.search-wrap { position: relative; flex: 1; max-width: 380px; }
+.stat-icon-wrap {
+  width: 44px; height: 44px; border-radius: var(--radius-lg);
+  display: flex; align-items: center; justify-content: center;
+  font-size: var(--text-lg); background: var(--bg-base);
+  box-shadow: var(--neu-inset); flex-shrink: 0;
+}
+.stat-icon-wrap.green  { color: var(--success-600); }
+.stat-icon-wrap.blue   { color: var(--info-600); }
+.stat-icon-wrap.red    { color: var(--error-600); }
+.stat-icon-wrap.orange { color: var(--warning-600); }
+
+.stat-val { font-size: var(--text-2xl); font-weight: var(--weight-extrabold); color: var(--text-primary); line-height: 1.1; }
+.stat-label { font-size: var(--text-xs); color: var(--text-secondary); font-weight: var(--weight-semibold); margin-top: 2px; }
+
+/* Toolbar */
+.toolbar { display: flex; gap: 12px; }
+.search-wrap { position: relative; flex: 1; max-width: 440px; }
 .search-icon {
-  position: absolute; left: 18px; top: 50%; transform: translateY(-50%);
-  color: #5a8a6a; font-size: 15px; z-index: 1;
+  position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+  color: var(--neutral-700); font-size: var(--text-sm); pointer-events: none;
 }
 .search-input {
-  width: 100%; padding: 13px 16px 13px 48px; border-radius: 999px;
-  border: 1.5px solid rgba(47, 125, 101, 0.15); 
-  background: rgba(255, 255, 255, 0.7); 
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  font-size: 14px; font-weight: 500; color: #1a2e1a; outline: none;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
-  box-sizing: border-box;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  width: 100%; padding: 12px 20px 12px 44px; border-radius: var(--radius-pill);
+  border: none; background: var(--bg-base);
+  box-shadow: var(--shadow-sm); font-size: var(--text-sm); color: var(--text-primary);
+  outline: none; transition: all var(--duration-fast);
 }
-.search-input::placeholder { color: #94a3b8; font-weight: 400; }
-.search-input:hover { background: rgba(255, 255, 255, 0.9); border-color: rgba(47, 125, 101, 0.3); }
-.search-input:focus { 
-  border-color: #2f7d65; background: #fff; 
-  box-shadow: 0 8px 20px rgba(47, 125, 101, 0.12), 0 0 0 4px rgba(47, 125, 101, 0.06);
-  transform: translateY(-1px);
+.search-input:focus {
+  background: var(--bg-base);
+  box-shadow: var(--shadow-md), 0 0 0 3px var(--orange-glow);
 }
 
-/* ─── Premium Toolbar Dropdown ────────────────────────────── */
 .filter-dropdown-wrap { position: relative; }
 .filter-btn {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 18px; border-radius: 999px;
-  border: 1.5px solid #e2e8f0; background: white;
-  color: #475569; font-size: 13px; font-weight: 600;
-  cursor: pointer; transition: all 0.25s;
-  min-width: 160px;
+  background: var(--bg-base); border: none; padding: 10px 18px; border-radius: var(--radius-pill);
+  font-size: var(--text-xs); font-weight: var(--weight-bold); color: var(--text-secondary);
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  box-shadow: var(--sku-btn-secondary-shadow); transition: all var(--duration-fast);
 }
-.filter-btn:hover { background: #f8fafc; border-color: #cbd5e1; transform: translateY(-1px); }
-.filter-btn .ms-auto { margin-left: auto; font-size: 11px; opacity: 0.6; }
+.filter-btn:hover { color: var(--orange-accent); box-shadow: var(--sku-btn-secondary-shadow-hover); }
 
 .filter-menu {
-  position: absolute; top: calc(100% + 8px); right: 0;
-  width: 220px; background: rgba(248, 253, 250, 0.96); border-radius: 20px;
-  box-shadow: 0 15px 35px rgba(47, 125, 101, 0.12), 0 5px 15px rgba(0,0,0,0.05);
-  padding: 8px; z-index: 100;
-  border: 1px solid rgba(47, 125, 101, 0.15);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  transform-origin: top right;
-  animation: menuIn 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+  position: absolute; top: calc(100% + 8px); right: 0; width: 220px;
+  background: var(--bg-base); border-radius: var(--radius-xl); border: none;
+  box-shadow: var(--neu-card-hover); z-index: var(--z-dropdown); padding: 8px;
 }
+.menu-header { display: flex; gap: 10px; align-items: center; padding: 8px; }
+.menu-icon-bg { width: 32px; height: 32px; border-radius: var(--radius-md); background: var(--orange-bg-subtle); color: var(--orange-accent); display: flex; align-items: center; justify-content: center; font-size: var(--text-sm); }
+.menu-title { font-size: var(--text-xs); font-weight: var(--weight-bold); color: var(--text-primary); }
+.menu-sub { font-size: 10px; color: var(--text-muted); }
+.menu-divider { height: 1px; background: var(--card-divider); margin: 6px 0; }
+.menu-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: var(--radius-md); font-size: var(--text-xs); font-weight: var(--weight-semibold); color: var(--text-secondary); cursor: pointer; transition: all var(--duration-fast); }
+.menu-item:hover { background: var(--bg-app); color: var(--orange-accent); box-shadow: var(--neu-inset); }
+.menu-item.active { background: var(--bg-app); box-shadow: var(--neu-inset); color: var(--orange-accent); font-weight: var(--weight-bold); }
 
-.menu-header { display: flex; align-items: center; gap: 12px; padding: 12px 14px 10px; }
-.menu-icon-bg {
-  width: 38px; height: 38px; border-radius: 12px;
-  background: #f1f5f9; color: #475569;
-  display: flex; align-items: center; justify-content: center; font-size: 16px;
-}
-.menu-info { display: flex; flex-direction: column; }
-.menu-title { font-size: 13px; font-weight: 700; color: #1e293b; }
-.menu-sub { font-size: 11px; color: #94a3b8; font-weight: 500; }
-
-.menu-divider { height: 1px; background: #f1f5f9; margin: 8px 0; }
-
-.menu-item {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 14px; border-radius: 12px;
-  cursor: pointer; transition: all 0.2s;
-  color: #475569;
-}
-.menu-item i { width: 16px; font-size: 14px; color: #94a3b8; transition: color 0.2s; }
-.menu-item span { font-size: 13px; font-weight: 600; flex: 1; }
-.menu-shortcut { font-size: 10px; color: #cbd5e1; font-weight: 700; opacity: 0.8; }
-
-.menu-item:hover { background: #ecfdf5; color: #059669; }
-.menu-item:hover i { color: #059669; }
-.menu-item.active { background: #f0fdf4; color: #15803d; }
-.menu-item.active i { color: #15803d; }
-
-@keyframes menuIn {
-  from { opacity: 0; transform: scale(0.95) translateY(-10px); }
-  to   { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-.menu-fade-enter-active, .menu-fade-leave-active { transition: all 0.2s ease; }
-.menu-fade-enter-from, .menu-fade-leave-to { opacity: 0; transform: translateY(-8px); }
-.filter-select {
-  padding: 10px 16px; border-radius: 999px; border: 1.5px solid #e0e0e0;
-  font-size: 13px; outline: none; background: #f7f7f7; cursor: pointer;
-}
-.filter-select:focus { border-color: #2f7d65; }
-
-/* ─── Buttons ────────────────────────────────────────────────── */
-.btn-primary {
-  background: #2f7d65; color: white; border: none;
-  padding: 10px 20px; border-radius: 999px; font-size: 13px;
-  font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;
-  transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
-}
-.btn-primary:hover { background: #256554; transform: translateY(-1px); box-shadow: 0 4px 14px rgba(47, 125, 101, 0.25); }
-.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-.btn-ghost {
-  background: rgba(47, 125, 101, 0.06); color: #2f7d65; border: none;
-  padding: 10px 20px; border-radius: 999px; font-size: 13px;
-  font-weight: 600; cursor: pointer; transition: all 0.2s;
-}
-.btn-ghost:hover { background: rgba(47, 125, 101, 0.12); color: #1a5c3a; }
-
-/* ─── Tile Grid ──────────────────────────────────────────────── */
-.tile-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 18px; animation: fadeInUp 0.4s ease 0.1s both;
-}
-
+/* Tile Grid */
+.tile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
 .user-tile {
-  background: linear-gradient(135deg, #f9fdfa 0%, #f0f7f3 100%);
-  border-radius: 18px; padding: 0;
-  border: 1.5px solid rgba(47, 125, 101, 0.12);
-  box-shadow: 0 4px 12px rgba(47, 125, 101, 0.04);
-  display: flex; flex-direction: column;
-  transition: transform 0.3s cubic-bezier(0.4,0,0.2,1), box-shadow 0.3s ease;
-  overflow: hidden; animation: fadeInUp 0.4s ease both;
-  position: relative;
+  background: var(--bg-base); border-radius: var(--radius-2xl); box-shadow: var(--neu-card);
+  display: flex; flex-direction: column; overflow: hidden;
+  transition: transform var(--duration-base) var(--ease-out), box-shadow var(--duration-base);
 }
-.user-tile::before {
-  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1.5px;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.9), transparent);
-  z-index: 1;
-}
-.user-tile:nth-child(1) { animation-delay: 0.05s; }
-.user-tile:nth-child(2) { animation-delay: 0.10s; }
-.user-tile:nth-child(3) { animation-delay: 0.15s; }
-.user-tile:nth-child(4) { animation-delay: 0.20s; }
-.user-tile:nth-child(n+5) { animation-delay: 0.25s; }
+.user-tile:hover { transform: translateY(-4px); box-shadow: var(--neu-card-hover); }
 
-.user-tile:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 10px 30px rgba(47, 125, 101, 0.12);
-}
-
-.tile-header {
-  display: flex; align-items: center; gap: 14px;
-  padding: 18px 20px 14px;
-  background: rgba(47, 125, 101, 0.03);
-  border-bottom: 1px solid rgba(47, 125, 101, 0.06);
-}
+.tile-header { display: flex; align-items: center; gap: 12px; padding: 18px 20px 14px; border-bottom: 1px solid var(--card-divider); }
 .user-avatar-small {
-  width: 40px; height: 40px; border-radius: 12px;
-  background: rgba(47, 125, 101, 0.1); color: #2f7d65;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 16px; font-weight: 700; flex-shrink: 0;
+  width: 42px; height: 42px; border-radius: 50%; background: var(--orange-gradient);
+  color: white; display: flex; align-items: center; justify-content: center; font-weight: var(--weight-bold);
+  font-size: var(--text-base); box-shadow: var(--sku-btn-primary-shadow); flex-shrink: 0;
 }
-.user-info-main { flex: 1; overflow: hidden; }
-.user-name {
-  font-size: 15px; font-weight: 700; color: #1a2e1a;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.user-email { font-size: 12px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.user-info-main { overflow: hidden; flex: 1; }
+.user-name { font-size: var(--text-base); font-weight: var(--weight-bold); color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.user-email { font-size: var(--text-xs); color: var(--neutral-700); font-weight: var(--weight-medium); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.tile-details { padding: 14px 20px; display: flex; flex-direction: column; gap: 8px; }
-.tile-row { display: flex; align-items: center; justify-content: space-between; }
-.badge-id {
-  background: rgba(47, 125, 101, 0.08); color: #2f7d65; border-radius: 8px;
-  padding: 3px 9px; font-size: 11px; font-weight: 700; font-family: monospace;
-  border: 1px solid rgba(47, 125, 101, 0.1);
-}
+.role-badge { padding: 3px 10px; border-radius: var(--radius-pill); font-size: 10px; font-weight: var(--weight-bold); }
+.role-badge.admin { background: var(--orange-bg-subtle); color: var(--orange-accent); border: 1px solid var(--orange-border); }
+.role-badge.collaborator { background: var(--info-bg); color: var(--info-700); border: 1px solid var(--info-border); }
+.role-badge.viewer { background: var(--neutral-100); color: var(--neutral-700); border: 1px solid var(--neutral-200); }
 
-.tile-footer {
-  padding: 12px 20px; border-top: 1px solid #f0f5f1;
-  display: flex; flex-direction: column; gap: 6px;
-}
-.tile-meta { display: flex; justify-content: space-between; align-items: center; }
-.tile-date { font-size: 11px; color: #94a3b8; font-weight: 500; }
+.tile-details { padding: 14px 20px; }
+.tile-row { display: flex; align-items: center; gap: 8px; }
+.badge-id { background: var(--neutral-100); color: var(--neutral-700); border: 1px solid var(--neutral-200); border-radius: var(--radius-xs); padding: 2px 8px; font-size: 11px; font-weight: var(--weight-bold); font-family: monospace; }
+.status-wrap { display: flex; align-items: center; gap: 8px; }
+.status-dot { font-size: 11px; font-weight: var(--weight-semibold); display: flex; align-items: center; gap: 4px; }
+.status-dot.active { color: var(--success-600); }
+.status-dot.inactive { color: var(--error-600); }
+.profile-indicator { font-size: 14px; }
+.profile-indicator.complete { color: var(--success-600); }
+.profile-indicator.incomplete { color: var(--warning-600); }
+
+.tile-footer { padding: 10px 20px; border-top: 1px solid var(--card-divider); background: var(--bg-base); font-size: 11px; color: var(--neutral-700); font-weight: var(--weight-semibold); }
 
 .tile-actions {
-  display: flex; gap: 6px; padding: 12px 20px; border-top: 1px solid #f0f5f1; align-items: center; justify-content: flex-start;
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 20px; background: var(--bg-app); border-top: 1px solid var(--card-divider);
 }
-
-.loading-state {
-  display: flex; align-items: center; justify-content: center;
-  padding: 60px 20px; color: #2f7d65; gap: 12px; font-size: 15px;
-}
-.empty-state {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  padding: 80px 20px; color: #94a3b8; gap: 16px;
-}
-.empty-state i { font-size: 40px; opacity: 0.4; }
-
-.role-badge {
-  padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600;
-}
-.role-badge.admin        { background: #fef3cd; color: #b45309; }
-.role-badge.collaborator { background: #dbeafe; color: #1d4ed8; }
-.role-badge.viewer       { background: #f3f4f6; color: #4b5563; }
-
-.status-dot {
-  display: inline-flex; align-items: center; gap: 5px;
-  font-size: 12px; font-weight: 500;
-}
-.status-dot::before { content: '●'; font-size: 8px; }
-.status-dot.active   { color: #15803d; }
-.status-dot.active::before { color: #22c55e; }
-.status-dot.inactive { color: #9ca3af; }
-
-/* ─── Action buttons ─────────────────────────────────────────── */
-.action-btns { display: flex; gap: 6px; align-items: center; }
-.role-toggle {
-  display: flex; background: #f0f0f0; border-radius: 8px; padding: 2px; gap: 2px;
-}
-.role-toggle label {
-  padding: 4px 10px; font-size: 10px; font-weight: 700; border-radius: 6px;
-  cursor: pointer; transition: all 0.2s; color: #777;
-}
-.role-toggle label:hover { color: #333; }
-.role-toggle label.active { background: white; color: #2f7d65; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-.role-toggle input { display: none; }
-
-.radio-group { display: flex; gap: 16px; margin-top: 4px; }
-.radio-group label {
-  display: flex; align-items: center; gap: 6px; font-size: 13px;
-  cursor: pointer; color: #444; font-weight: 500;
-}
-.radio-group input { cursor: pointer; accent-color: #2f7d65; }
 
 .icon-action {
-  width: 28px; height: 28px; border-radius: 8px; border: none;
-  cursor: pointer; font-size: 12px; display: flex; align-items: center;
-  justify-content: center; transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+  width: 36px; height: 36px; border-radius: var(--radius-lg); border: none;
+  background: var(--bg-base); box-shadow: var(--sku-btn-secondary-shadow);
+  color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all var(--duration-fast);
 }
-.icon-action:hover { transform: scale(1.12); }
-.icon-action.blacklist { background: #fee2e2; color: #dc2626; }
-.icon-action.blacklist:hover { background: #dc2626; color: white; box-shadow: 0 4px 10px rgba(220, 38, 38, 0.2); }
+.icon-action:hover { color: var(--orange-accent); box-shadow: var(--sku-btn-secondary-shadow-hover); }
+.icon-action.blacklist:hover { color: var(--error-600); }
+.icon-action.unblacklist:hover { color: var(--success-600); }
 
-.status-wrap { display: flex; align-items: center; gap: 8px; }
-.profile-indicator { font-size: 14px; }
-.profile-indicator.complete { color: #22c55e; }
-.profile-indicator.incomplete { color: #f59e0b; opacity: 0.6; }
+.role-toggle { display: flex; background: var(--bg-base); border-radius: var(--radius-lg); padding: 3px; box-shadow: var(--neu-inset); flex: 1; }
+.role-toggle label {
+  flex: 1; text-align: center; padding: 6px; border-radius: var(--radius-md);
+  font-size: 11px; font-weight: var(--weight-bold); color: var(--text-secondary);
+  cursor: pointer; transition: all var(--duration-fast);
+}
+.role-toggle label.active { background: var(--bg-base); box-shadow: var(--sku-btn-secondary-shadow); color: var(--orange-accent); }
+.role-toggle input { display: none; }
 
-.icon-action.view { background: rgba(61, 90, 128, 0.08); color: #3d5a80; }
-.icon-action.view:hover { background: #3d5a80; color: white; box-shadow: 0 4px 10px rgba(61, 90, 128, 0.2); }
+.ms-auto { margin-left: auto; }
+.loading-state, .empty-state { text-align: center; padding: 48px 24px; color: var(--text-muted); font-size: var(--text-sm); display: flex; flex-direction: column; align-items: center; gap: 8px; }
 
-/* ─── Profile Modal ────────────────────────────────────────── */
-.profile-header-wrap { display: flex; align-items: center; gap: 20px; margin-bottom: 24px; padding-bottom: 24px; border-bottom: 1px solid #f1f5f9; }
-.avatar-circle { width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, #e6f5ee, #d6ede3); color: #2f7d65; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; box-shadow: 0 4px 12px rgba(47, 125, 101, 0.12); }
-.header-info h3 { font-size: 18px; font-weight: 800; color: #1e293b; margin: 0; }
-.header-info p { font-size: 14px; color: #64748b; margin: 2px 0 8px; }
+.pagination { display: flex; justify-content: center; align-items: center; gap: 16px; padding-top: 10px; }
+.page-btn {
+  width: 38px; height: 38px; border-radius: var(--radius-lg); border: none;
+  background: var(--bg-base); box-shadow: var(--sku-btn-secondary-shadow); color: var(--text-primary);
+  cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all var(--duration-fast);
+}
+.page-btn:hover:not(:disabled) { color: var(--orange-accent); box-shadow: var(--sku-btn-secondary-shadow-hover); }
+.page-btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+.page-info { font-size: var(--text-xs); font-weight: var(--weight-bold); color: var(--text-secondary); }
 
-.profile-status-badge { padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
-.profile-status-badge.complete { background: #dcfce7; color: #15803d; }
-.profile-status-badge.incomplete { background: #fef3c7; color: #b45309; }
+/* Modals */
+.modal-overlay { position: fixed; inset: 0; background: var(--overlay-bg); backdrop-filter: var(--glass-blur-sm); display: flex; align-items: center; justify-content: center; z-index: var(--z-modal); padding: 20px; }
+.modal { background: var(--bg-base); border-radius: var(--radius-2xl); width: 100%; max-width: 480px; box-shadow: var(--neu-card-hover); border: none; display: flex; flex-direction: column; overflow: hidden; }
+.modal-sm { max-width: 400px; }
+.modal-md { max-width: 520px; }
 
-.details-grid-modal { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 24px; border-bottom: 1px solid var(--card-divider); }
+.modal-title-group { display: flex; align-items: center; gap: 10px; }
+.modal-icon-wrap { width: 36px; height: 36px; border-radius: var(--radius-md); background: var(--orange-bg-subtle); color: var(--orange-accent); display: flex; align-items: center; justify-content: center; font-size: var(--text-base); }
+.modal-header h2 { font-size: var(--text-lg); font-weight: var(--weight-bold); color: var(--text-primary); margin: 0; }
+.modal-close { width: 32px; height: 32px; border-radius: 50%; background: transparent; border: none; cursor: pointer; font-size: var(--text-xs); color: var(--text-muted); display: flex; align-items: center; justify-content: center; }
+.modal-close:hover { background: var(--bg-app); color: var(--text-primary); }
+
+.modal-body { padding: 20px 24px; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 24px; border-top: 1px solid var(--card-divider); background: var(--bg-app); }
+
+.profile-modal-body { display: flex; flex-direction: column; gap: 20px; }
+.profile-header-wrap { display: flex; align-items: center; gap: 16px; background: var(--bg-app); padding: 16px; border-radius: var(--radius-xl); border: none; box-shadow: var(--neu-inset); }
+.avatar-circle { width: 52px; height: 52px; border-radius: 50%; background: var(--orange-gradient); color: white; display: flex; align-items: center; justify-content: center; font-size: var(--text-xl); font-weight: var(--weight-bold); box-shadow: var(--sku-btn-primary-shadow); }
+.header-info h3 { font-size: var(--text-base); font-weight: var(--weight-bold); color: var(--text-primary); margin: 0; }
+.header-info p { font-size: var(--text-xs); color: var(--text-secondary); margin: 2px 0 6px; }
+
+.profile-status-badge { padding: 2px 8px; border-radius: var(--radius-pill); font-size: 10px; font-weight: var(--weight-bold); }
+.profile-status-badge.complete { background: var(--success-bg); color: var(--success-700); border: 1px solid var(--success-border); }
+.profile-status-badge.incomplete { background: var(--warning-bg); color: var(--warning-700); border: 1px solid var(--warning-border); }
+
+.details-grid-modal { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .detail-item { display: flex; flex-direction: column; gap: 4px; }
-.detail-item label { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; }
-.detail-item span { font-size: 14px; color: #1e293b; }
-.detail-item span.mono { font-family: monospace; font-weight: 700; color: #3d5a80; }
-.detail-item span.bold-val { font-weight: 700; color: #334155; }
-.role-pill-sm { background: #f1f5f9; color: #475569; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; }
+.detail-item label { font-size: 11px; font-weight: var(--weight-bold); color: var(--text-muted); text-transform: uppercase; }
+.detail-item .mono { font-family: monospace; font-size: var(--text-xs); color: var(--orange-accent); font-weight: var(--weight-bold); }
+.detail-item .bold-val { font-size: var(--text-xs); font-weight: var(--weight-semibold); color: var(--text-primary); }
+.role-pill-sm { font-size: 11px; font-weight: var(--weight-bold); color: var(--text-primary); }
 
-.ping-section { margin-top: 32px; padding: 20px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 16px; display: flex; flex-direction: column; gap: 16px; align-items: center; text-align: center; }
-.ping-info { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #92400e; font-weight: 600; }
-.btn-ping { width: 100%; padding: 12px; background: #f59e0b; color: white; border: none; border-radius: 10px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.2s; }
-.btn-ping:hover:not(:disabled) { background: #d97706; transform: translateY(-1px); }
+/* User Records Access Section */
+.user-records-access-section {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(166, 169, 173, 0.25);
+}
 
-.alert-box {
+.section-title {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 600;
-  margin-top: 16px;
-}
-.alert-box.error {
-  background: #fef2f2;
-  color: #ef4444;
-  border: 1px solid #fee2e2;
-}
-.alert-box i { font-size: 16px; }
-
-.icon-action.unblacklist { background: #dcfce7; color: #16a34a; }
-.icon-action.unblacklist:hover { background: #16a34a; color: white; box-shadow: 0 4px 10px rgba(22, 163, 106, 0.2); }
-
-.btn-danger { background: #dc2626; color: white; border: none; }
-.btn-danger:hover { background: #b91c1c; }
-
-/* ─── Pagination ─────────────────────────────────────────────── */
-.pagination { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 14px; }
-.page-btn {
-  width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid #ddd;
-  background: white; cursor: pointer; font-size: 12px;
-  display: flex; align-items: center; justify-content: center;
-  transition: all 0.2s;
-}
-.page-btn:hover:not(:disabled) { border-color: #2f7d65; color: #2f7d65; }
-.page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-.page-info { font-size: 13px; color: #666; }
-
-/* ─── Modal ──────────────────────────────────────────────────── */
-.modal-overlay {
-  position: fixed; inset: 0; background: rgba(15, 23, 42, 0.4);
-  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 100; animation: fadeIn 0.2s ease;
-}
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-.modal {
-  background: white; border-radius: 22px; width: 680px; max-width: 95vw;
-  max-height: 90vh; display: flex; flex-direction: column;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.18), 0 0 0 1px rgba(47,125,101,0.08); animation: slideUp 0.25s ease;
-}
-.modal-sm { width: 440px; }
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.modal-header {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 22px 26px 18px; border-bottom: 1px solid #eee;
-}
-.modal-header h2 { font-size: 17px; font-weight: 700; color: #1a2e1a; margin: 0; }
-.modal-close {
-  width: 32px; height: 32px; border-radius: 50%; background: #f1f5f9;
-  border: none; cursor: pointer; font-size: 13px; color: #64748b; transition: all 0.2s;
-}
-.modal-close:hover { background: #e2e8f0; color: #1e293b; transform: rotate(90deg); }
-.modal-body { padding: 20px 26px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 14px; }
-.modal-footer {
-  display: flex; justify-content: flex-end; gap: 10px;
-  padding: 16px 26px 22px; border-top: 1px solid #eee;
+  gap: 8px;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
 }
 
-/* ─── Form ───────────────────────────────────────────────────── */
-.form-group { display: flex; flex-direction: column; gap: 6px; }
-.form-group label { font-size: 12px; font-weight: 600; color: #5a8a6a; }
-.form-group input,
-.form-group select {
-  padding: 10px 14px; border-radius: 10px;
-  border: 1.5px solid #e0e0e0; font-size: 13px; outline: none;
-  transition: border-color 0.2s;
+.count-pill {
+  background: var(--orange-accent);
+  color: white;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+  font-weight: 800;
 }
-.form-group input:focus,
-.form-group select:focus { border-color: #2f7d65; }
 
-.info-box {
-  display: flex; gap: 12px; padding: 14px 16px;
-  background: #edf7f2; border-radius: 12px; border: 1px solid #b7e4ca;
-  font-size: 13px; color: #1a5c3a; align-items: flex-start;
+.user-records-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 190px;
+  overflow-y: auto;
+  padding-right: 4px;
 }
-.link-text { font-family: monospace; font-size: 11px; margin: 4px 0 0; word-break: break-all; color: #2f7d65; }
-.error-msg { color: #dc2626; font-size: 12px; }
+
+.user-record-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-card);
+  border: 1px solid rgba(166, 169, 173, 0.3);
+  padding: 8px 12px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs);
+  transition: all var(--duration-fast);
+}
+
+.user-record-card:hover {
+  border-color: var(--orange-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.rec-main { display: flex; flex-direction: column; gap: 2px; }
+.rec-name { font-size: 11.5px; font-weight: 800; color: var(--text-primary); }
+.rec-meta { font-size: 10px; color: var(--text-muted); }
+.rec-id { font-family: monospace; font-weight: 700; color: var(--orange-accent); }
+
+.access-pill {
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.access-pill.edit { background: var(--success-bg); color: var(--success-700); border: 1px solid var(--success-border); }
+.access-pill.view { background: var(--info-bg); color: var(--info-700); border: 1px solid var(--info-border); }
+
+.user-records-empty {
+  text-align: center;
+  padding: 16px;
+  background: var(--bg-app);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.ping-section { display: flex; justify-content: space-between; align-items: center; background: var(--warning-bg); border: 1px solid var(--warning-border); padding: 12px 16px; border-radius: var(--radius-lg); }
+.ping-info { font-size: var(--text-xs); color: var(--warning-700); display: flex; align-items: center; gap: 8px; font-weight: var(--weight-semibold); }
+.btn-ping { background: var(--warning-500); color: white; border: none; padding: 8px 14px; border-radius: var(--radius-pill); font-size: var(--text-xs); font-weight: var(--weight-bold); cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: var(--sku-btn-primary-shadow); }
+.btn-ping:hover:not(:disabled) { background: var(--warning-600); }
+
+.form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.form-group label { font-size: var(--text-xs); font-weight: var(--weight-semibold); color: var(--text-primary); }
+.form-group input { padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid rgba(166, 169, 173, 0.55); background: var(--bg-input); box-shadow: var(--neu-inset); font-size: var(--text-xs); font-weight: var(--weight-semibold); outline: none; transition: all var(--duration-fast); color: var(--text-primary); }
+.form-group input:focus { border-color: var(--orange-accent); background: var(--bg-input-focus); box-shadow: inset 0 2px 4px rgba(35, 28, 20, 0.08), 0 0 0 3px var(--orange-glow), 0 1px 0 rgba(255, 255, 255, 0.8); }
+
+.role-selector { display: flex; gap: 10px; }
+.role-btn-option { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px; border-radius: var(--radius-lg); border: 1px solid rgba(166, 169, 173, 0.4); background: var(--bg-input); box-shadow: var(--neu-btn); cursor: pointer; transition: all var(--duration-fast); color: var(--text-secondary); }
+.role-btn-option.active { border-color: var(--orange-accent); background: var(--orange-bg-subtle); color: var(--orange-accent); box-shadow: var(--neu-pressed); }
+.role-btn-label { font-size: var(--text-xs); font-weight: var(--weight-bold); }
+
+.alert-box { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: var(--radius-md); font-size: var(--text-xs); font-weight: var(--weight-semibold); }
+.alert-box.error { background: var(--error-bg); border: 1px solid var(--error-border); color: var(--error-700); }
+
+.btn-primary { background: var(--orange-gradient); color: white; border: none; padding: 10px 18px; border-radius: var(--radius-pill); font-size: var(--text-xs); font-weight: var(--weight-bold); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all var(--duration-base); box-shadow: var(--sku-btn-primary-shadow); }
+.btn-primary:hover:not(:disabled) { box-shadow: var(--sku-btn-primary-shadow-hover); transform: translateY(-1px); }
+
+.btn-ghost { background: var(--bg-base); color: var(--text-secondary); border: none; padding: 8px 16px; border-radius: var(--radius-pill); font-size: var(--text-xs); font-weight: var(--weight-bold); cursor: pointer; transition: all var(--duration-base); box-shadow: var(--sku-btn-secondary-shadow); }
+.btn-ghost:hover { color: var(--orange-accent); box-shadow: var(--sku-btn-secondary-shadow-hover); }
+
+.btn-danger { background: var(--error-600); color: white; border: none; padding: 10px 18px; border-radius: var(--radius-pill); font-size: var(--text-xs); font-weight: var(--weight-bold); cursor: pointer; }
+.btn-danger:hover { background: var(--error-700); }
+
+@media (max-width: 900px) { .stats-row { grid-template-columns: repeat(2, 1fr); } }
 </style>

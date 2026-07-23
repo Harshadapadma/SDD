@@ -3,13 +3,35 @@ import api from '../api/client'
 
 // ─── Shared singleton state ───────────────────────────────────
 const notifications  = ref<any[]>([])
-const isMuted        = ref(localStorage.getItem('notif_muted') === 'true')
+const isMuted        = ref(localStorage.getItem('notif_muted')       === 'true')
+const isSoundMuted   = ref(localStorage.getItem('notif_sound_muted') === 'true')
 const toasts         = ref<any[]>([])   // active toast popups
 const seenIds        = new Set<number>() // IDs already shown as toast
 let   pollTimer: ReturnType<typeof setInterval> | null = null
 
-// A soft, very short beep base64 (tiny wav file)
-const CHIME_AUDIO = 'data:audio/wav;base64,UklGRjIAAABXQVZFZm10IBIAAAABAAEAQB8AAEAfAAABAAgAAABmYWN0BAAAAAAAAABkYXRhAAAAAA==';
+// ─── Universal chime (one simple two-note ding for everything) ─
+function playChime() {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+    const gain = ctx.createGain()
+    gain.connect(ctx.destination)
+    gain.gain.setValueAtTime(0.15, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.55)
+
+    // Two sine tones staggered slightly: A5 then C#6 — clean, neutral ding
+    const frequencies = [880, 1108]
+    frequencies.forEach((freq, i) => {
+      const osc = ctx.createOscillator()
+      osc.type = 'sine'
+      osc.frequency.value = freq
+      osc.connect(gain)
+      osc.start(ctx.currentTime + i * 0.07)
+      osc.stop(ctx.currentTime + 0.55)
+    })
+
+    setTimeout(() => ctx.close(), 700)
+  } catch (_) {}
+}
 
 export type NotificationType = 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR'
 
@@ -68,10 +90,15 @@ export function useNotifications() {
     notifications.value.forEach(n => (n.is_read = true))
   }
 
-  // ─── Mute toggle ─────────────────────────────────────────────
+  // ─── Mute toggles ─────────────────────────────────────────────
   function toggleMute() {
     isMuted.value = !isMuted.value
     localStorage.setItem('notif_muted', String(isMuted.value))
+  }
+
+  function toggleSoundMute() {
+    isSoundMuted.value = !isSoundMuted.value
+    localStorage.setItem('notif_sound_muted', String(isSoundMuted.value))
   }
 
   // ─── Toast queue ─────────────────────────────────────────────
@@ -87,13 +114,9 @@ export function useNotifications() {
       leaving: false
     })
 
-    // Play chime if not muted
-    if (!isMuted.value) {
-      try {
-        const audio = new Audio(CHIME_AUDIO)
-        audio.volume = 0.5
-        audio.play().catch(() => {})
-      } catch (e) {}
+    // Play chime unless sound is muted
+    if (!isSoundMuted.value) {
+      playChime()
     }
 
     // After 5.0 s start the "fly to bell" exit animation
@@ -139,9 +162,9 @@ export function useNotifications() {
   }
 
   return {
-    notifications, unreadCount, isMuted, toasts,
+    notifications, unreadCount, isMuted, isSoundMuted, toasts,
     fetchNotifications, startPolling, stopPolling,
-    markRead, markAllRead, toggleMute, dismissToast,
+    markRead, markAllRead, toggleMute, toggleSoundMute, dismissToast,
     notify,
     typeIcon, typeColor, formatTime,
   }

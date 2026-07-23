@@ -62,6 +62,24 @@ class UserCreateSerializer(serializers.ModelSerializer):
         model = User
         fields = ["email", "name", "role"]
 
+    def validate_name(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Name cannot be empty.")
+        if len(value) < 2:
+            raise serializers.ValidationError("Name must be at least 2 characters long.")
+        if not re.match(r"^[a-zA-Z\s\.\-\']+$", value):
+            raise serializers.ValidationError("Name must contain only letters, spaces, dots, hyphens, and single quotes.")
+        return value
+
+    def validate_email(self, value):
+        value = value.strip().lower()
+        if not re.match(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$", value):
+            raise serializers.ValidationError("Enter a valid email address.")
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("A user with this email address already exists.")
+        return value
+
     def create(self, validated_data):
         user = User.objects.create_user(
             email=validated_data["email"],
@@ -117,6 +135,7 @@ class SetPasswordSerializer(serializers.Serializer):
 # -------------------------------
 class UserListSerializer(serializers.ModelSerializer):
     is_profile_complete = serializers.ReadOnlyField()
+    records_access = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -131,7 +150,22 @@ class UserListSerializer(serializers.ModelSerializer):
             "designation",
             "company_name",
             "mobile_number",
-            "created_at"
+            "created_at",
+            "records_access"
+        ]
+
+    def get_records_access(self, obj):
+        from apps.records.models import RecordAccess
+        accesses = RecordAccess.objects.filter(user=obj).select_related('record')
+        return [
+            {
+                "record_id": a.record.public_id,
+                "record_name": a.record.name,
+                "pan": a.record.pan,
+                "source_company": a.record.source_company,
+                "access_type": "VIEW" if obj.role == "VIEWER" else a.access_type
+            }
+            for a in accesses
         ]
 
 # -------------------------------
@@ -142,11 +176,36 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
         model = User
         fields = ["name", "designation", "company_name", "mobile_number"]
 
+    def validate_name(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Name cannot be empty.")
+        if len(value) < 2:
+            raise serializers.ValidationError("Name must be at least 2 characters long.")
+        if not re.match(r"^[a-zA-Z\s\.\-\']+$", value):
+            raise serializers.ValidationError("Name must contain only letters, spaces, dots, hyphens, and single quotes.")
+        return value
+
+    def validate_designation(self, value):
+        if value:
+            value = value.strip()
+            if value and len(value) < 2:
+                raise serializers.ValidationError("Designation must be at least 2 characters long.")
+        return value
+
+    def validate_company_name(self, value):
+        if value:
+            value = value.strip()
+            if value and len(value) < 2:
+                raise serializers.ValidationError("Company name must be at least 2 characters long.")
+        return value
+
     def validate_mobile_number(self, value):
         if value:
-            digits = re.sub(r'\D', '', value)
-            if len(digits) != 10:
-                raise serializers.ValidationError("Mobile number must be exactly 10 digits.")
+            value = value.strip()
+            if value:
+                if not re.match(r"^\d{10}$", value):
+                    raise serializers.ValidationError("Mobile number must be exactly 10 digits.")
         return value
 
 # -------------------------------
