@@ -246,6 +246,38 @@ class UserRequestsListView(APIView):
             "edit_requests": EditRequestSerializer(edits, many=True).data
         })
 
+
+# -------------------------------
+# Pending Request Count (for Red Dot indicator)
+# -------------------------------
+class PendingRequestCountView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        if user.role in ["COMPLIANCE_OFFICER", "ADMIN"]:
+            del_count = DeleteRequest.objects.filter(status='PENDING').count()
+            create_count = CreationRequest.objects.filter(status='PENDING').count()
+            edit_count = EditRequest.objects.filter(status='PENDING').count()
+            role_count = RoleChangeRequest.objects.filter(status='PENDING').count()
+            access_count = AccessRequest.objects.filter(status='PENDING').count()
+            unread_clarifications = ClarificationMessage.objects.exclude(sender__role__in=['COMPLIANCE_OFFICER', 'ADMIN']).filter(is_read=False).count()
+        else:
+            del_count = DeleteRequest.objects.filter(requested_by=user, status='PENDING').count()
+            create_count = CreationRequest.objects.filter(requested_by=user, status='PENDING').count()
+            edit_count = EditRequest.objects.filter(requested_by=user, status='PENDING').count()
+            role_count = RoleChangeRequest.objects.filter(user=user, status='PENDING').count()
+            access_count = AccessRequest.objects.filter(user=user, status='PENDING').count()
+            unread_clarifications = ClarificationMessage.objects.filter(creation_request__requested_by=user, is_read=False).exclude(sender=user).count()
+
+        total_pending = del_count + create_count + edit_count + role_count + access_count
+        return Response({
+            "pending_count": total_pending,
+            "has_pending": total_pending > 0,
+            "unread_clarifications_count": unread_clarifications,
+            "has_unread_clarifications": unread_clarifications > 0
+        })
+
 # -------------------------------
 # Request Access Upgrade
 # -------------------------------
@@ -530,6 +562,12 @@ class CreationRequestClarificationView(APIView):
         if request.user.role != "COMPLIANCE_OFFICER" and req.requested_by != request.user:
             return Response({"error": "Permission denied"}, status=403)
 
+        # Mark messages sent by the other party as read
+        if request.user.role in ["COMPLIANCE_OFFICER", "ADMIN"]:
+            req.clarification_messages.exclude(sender__role__in=["COMPLIANCE_OFFICER", "ADMIN"]).filter(is_read=False).update(is_read=True)
+        else:
+            req.clarification_messages.exclude(sender=request.user).filter(is_read=False).update(is_read=True)
+
         messages = req.clarification_messages.all().order_by('created_at')
         serializer = ClarificationMessageSerializer(messages, many=True, context={"request": request})
         return Response(serializer.data)
@@ -550,7 +588,8 @@ class CreationRequestClarificationView(APIView):
         message = ClarificationMessage.objects.create(
             creation_request=req,
             sender=request.user,
-            message=msg_text
+            message=msg_text,
+            is_read=False
         )
 
         if request.user.role == "COMPLIANCE_OFFICER":
@@ -584,5 +623,5 @@ class MyClarificationsListView(APIView):
         else:
             reqs = CreationRequest.objects.filter(requested_by=user, clarification_messages__isnull=False).distinct().order_by('-updated_at')
 
-        serializer = CreationRequestSerializer(reqs, many=True)
+        serializer = CreationRequestSerializer(reqs, many=True, context={"request": request})
         return Response(serializer.data)

@@ -116,6 +116,14 @@
             <button class="icon-action view" title="View Profile Details" @click="viewProfile(u)">
               <i class="fas fa-eye"></i>
             </button>
+            <button 
+              v-if="!u.is_active" 
+              class="icon-action mail" 
+              title="Resend Activation Email" 
+              @click="resendActivation(u)"
+            >
+              <i class="fas fa-paper-plane"></i>
+            </button>
             <div class="role-toggle">
               <label :class="{ active: u.role === 'COLLABORATOR' }">
                 <input type="radio" :name="'role-'+u.public_id" value="COLLABORATOR" :checked="u.role === 'COLLABORATOR'" @click.prevent="promptRoleChange(u, 'COLLABORATOR')" />
@@ -289,11 +297,11 @@
         <div class="modal-body">
           <div class="form-group">
             <label>Full Name *</label>
-            <input v-model="form.name" placeholder="e.g. Rahul Sharma" maxlength="255" @input="form.name = form.name.replace(/[^a-zA-Z\s\.\-']/g, '')" />
+            <input v-model="form.name" maxlength="255" @input="form.name = form.name.replace(/[^a-zA-Z\s\.\-']/g, '')" />
           </div>
           <div class="form-group">
             <label>Email Address *</label>
-            <input v-model="form.email" type="email" placeholder="rahul@company.com" maxlength="255" />
+            <input v-model="form.email" type="email" maxlength="255" />
           </div>
           <div class="form-group">
             <label>System Role *</label>
@@ -436,6 +444,16 @@ async function pingUser(user: any) {
     notify('Ping Failed', 'Failed to send notification.', 'ERROR')
   } finally {
     pinging.value = false
+  }
+}
+
+async function resendActivation(user: any) {
+  try {
+    await api.post('auth/resend-activation/', { public_id: user.public_id })
+    notify('Email Sent', `Activation email resent to ${user.email}.`, 'SUCCESS')
+  } catch (err: any) {
+    const msg = err.response?.data?.error || 'Failed to resend activation email.'
+    notify('Resend Failed', msg, 'ERROR')
   }
 }
 

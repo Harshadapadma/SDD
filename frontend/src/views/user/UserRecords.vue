@@ -34,7 +34,7 @@
       </div>
     </div>
 
-    <!-- SEARCH TOOLBAR -->
+    <!-- SEARCH TOOLBAR & STATUS FILTER TOGGLE -->
     <div class="toolbar">
       <div class="search-wrap">
         <i class="fas fa-search search-icon"></i>
@@ -45,6 +45,28 @@
           placeholder="Search by name, PAN, record ID…"
         />
       </div>
+
+      <div class="filter-toggle-group" v-if="isCollaborator">
+        <button
+          type="button"
+          class="filter-toggle-btn"
+          :class="{ active: statusFilter === 'APPROVED' }"
+          @click="setStatusFilter('APPROVED')"
+        >
+          <i class="fas fa-circle-check"></i>
+          <span>Confirmed Records</span>
+        </button>
+        <button
+          type="button"
+          class="filter-toggle-btn"
+          :class="{ active: statusFilter === 'PENDING' }"
+          @click="setStatusFilter('PENDING')"
+        >
+          <i class="fas fa-clock"></i>
+          <span>Pending Approval</span>
+          <span class="badge-count" v-if="pendingCount > 0">{{ pendingCount }}</span>
+        </button>
+      </div>
     </div>
 
     <!-- TILE GRID -->
@@ -54,7 +76,8 @@
 
     <div v-else-if="records.length === 0" class="empty-state">
       <i class="fas fa-inbox"></i>
-      <p>No records found.</p>
+      <p v-if="statusFilter === 'PENDING'">No pending record creation requests.</p>
+      <p v-else>No confirmed records found.</p>
     </div>
 
     <div v-else class="tile-grid">
@@ -62,7 +85,10 @@
         <div class="tile-header">
           <div class="tile-icon"><i class="fas fa-file-alt"></i></div>
           <div class="tile-name-wrap">
-            <div class="tile-name">{{ record.name }}</div>
+            <div class="tile-name">
+              {{ record.name }}
+              <span v-if="record.status === 'PENDING_CREATION'" class="tile-pending-tag"><i class="fas fa-clock"></i> Pending Confirmation</span>
+            </div>
             <div class="tile-subname" v-if="record.designation">{{ record.designation }}</div>
           </div>
         </div>
@@ -132,43 +158,43 @@
             <div class="form-grid">
               <div class="form-group">
                 <label>Full Name *</label>
-                <input v-model="form.name" maxlength="255" placeholder="e.g. Rahul Sharma" @input="form.name = form.name.replace(/[^a-zA-Z\s\.\-']/g, '')" />
+                <input v-model="form.name" maxlength="255" @input="form.name = form.name.replace(/[^a-zA-Z\s\.\-']/g, '')" />
               </div>
               <div class="form-group">
                 <label>Designation *</label>
-                <input v-model="form.designation" maxlength="255" placeholder="e.g. Senior Manager" />
+                <input v-model="form.designation" maxlength="255" />
               </div>
               <div class="form-group">
                 <label>Employee Code *</label>
-                <input v-model="form.employee_code" maxlength="50" placeholder="e.g. EMP-2026/01" @input="form.employee_code = form.employee_code.replace(/[^a-zA-Z0-9\-\/]/g, '')" />
+                <input v-model="form.employee_code" maxlength="50" @input="form.employee_code = form.employee_code.replace(/[^a-zA-Z0-9\-\/]/g, '')" />
               </div>
               <div class="form-group">
                 <label>PAN Card Number *</label>
-                <input v-model="form.pan" maxlength="10" placeholder="ABCDE1234F" @input="form.pan = form.pan.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10)" />
+                <input v-model="form.pan" maxlength="10" @input="form.pan = form.pan.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10)" />
               </div>
               <div class="form-group">
                 <label>Disclosure Company *</label>
-                <input v-model="form.source_company" maxlength="255" placeholder="e.g. Negen Capital" />
+                <input v-model="form.source_company" maxlength="255" />
               </div>
               <div class="form-group">
                 <label>Date Received *</label>
-                <input type="date" v-model="form.info_received_date" :max="todayDate" />
+                <CustomDatePicker v-model="form.info_received_date" :max="todayDate" placeholder="" />
               </div>
               <div class="form-group">
                 <label>Disclosure Name *</label>
-                <input v-model="form.disclosure_name" maxlength="255" placeholder="e.g. Officer Name" @input="form.disclosure_name = form.disclosure_name.replace(/[^a-zA-Z\s\.\-']/g, '')" />
+                <input v-model="form.disclosure_name" maxlength="255" @input="form.disclosure_name = form.disclosure_name.replace(/[^a-zA-Z\s\.\-']/g, '')" />
               </div>
               <div class="form-group">
                 <label>Disclosure Designation (Optional)</label>
-                <input v-model="form.disclosure_designation" maxlength="255" placeholder="e.g. Compliance Officer" />
+                <input v-model="form.disclosure_designation" maxlength="255" />
               </div>
               <div class="form-group">
                 <label>Disclosure Department (Optional)</label>
-                <input v-model="form.disclosure_department" maxlength="255" placeholder="e.g. Legal & Compliance" />
+                <input v-model="form.disclosure_department" maxlength="255" />
               </div>
               <div class="form-group full-width">
                 <label>Information Details *</label>
-                <textarea v-model="form.info_details" rows="3" placeholder="Enter confidential disclosure details..."></textarea>
+                <textarea v-model="form.info_details" rows="3"></textarea>
               </div>
             </div>
             <p class="error-msg" v-if="createError">{{ createError }}</p>
@@ -222,7 +248,7 @@
               </div>
               <div class="form-group">
                 <label>Date Received *</label>
-                <input type="date" v-model="editForm.info_received_date" :max="todayDate" />
+                <CustomDatePicker v-model="editForm.info_received_date" :max="todayDate" />
               </div>
               <div class="form-group">
                 <label>Disclosure Name *</label>
@@ -285,6 +311,7 @@
 import { ref, computed, onMounted } from 'vue'
 import api from '../../api/client'
 import { useNotifications } from '../../composables/useNotifications'
+import CustomDatePicker from '../../components/CustomDatePicker.vue'
 
 const user = JSON.parse(localStorage.getItem('user') || '{}')
 const isCollaborator = computed(() => user?.role === 'COLLABORATOR')
@@ -296,6 +323,8 @@ const page = ref(1)
 const pageSize = 10
 const search = ref('')
 const loading = ref(false)
+const statusFilter = ref<'APPROVED' | 'PENDING'>('APPROVED')
+const pendingCount = ref(0)
 
 const totalPages = computed(() => Math.ceil(total.value / pageSize))
 const todayCount = computed(() => {
@@ -303,14 +332,31 @@ const todayCount = computed(() => {
   return records.value.filter(r => r.created_at?.startsWith(today)).length
 })
 
+async function fetchPendingCount() {
+  if (!isCollaborator.value) return
+  try {
+    const res = await api.get('records/', { params: { status: 'PENDING', page_size: 1 } })
+    pendingCount.value = res.data.count || 0
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+function setStatusFilter(filter: 'APPROVED' | 'PENDING') {
+  statusFilter.value = filter
+  page.value = 1
+  fetchRecords()
+}
+
 async function fetchRecords() {
   loading.value = true
   try {
-    const params: any = { page: page.value, page_size: pageSize }
+    const params: any = { page: page.value, page_size: pageSize, status: statusFilter.value }
     if (search.value) params.search = search.value
     const res = await api.get('records/', { params })
     records.value = res.data.results
     total.value = res.data.count
+    fetchPendingCount()
   } catch (e) {
     console.error(e)
   } finally {
@@ -560,8 +606,9 @@ onMounted(fetchRecords)
 .stat-val { font-size: var(--text-2xl); font-weight: var(--weight-extrabold); color: var(--text-primary); line-height: 1.1; }
 .stat-label { font-size: var(--text-xs); color: var(--text-secondary); font-weight: var(--weight-semibold); margin-top: 2px; }
 
-.toolbar { display: flex; gap: 12px; }
-.search-wrap { position: relative; flex: 1; max-width: 560px; }
+/* Toolbar */
+.toolbar { display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.search-wrap { position: relative; flex: 1; min-width: 280px; max-width: 440px; }
 .search-icon {
   position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
   color: var(--neutral-700); font-size: var(--text-sm); pointer-events: none;
@@ -575,6 +622,64 @@ onMounted(fetchRecords)
 .search-input:focus {
   background: var(--bg-base);
   box-shadow: var(--shadow-md), 0 0 0 3px var(--orange-glow);
+}
+
+.filter-toggle-group {
+  display: flex;
+  background: var(--bg-base);
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(166, 169, 173, 0.35);
+  box-shadow: var(--shadow-xs);
+  gap: 4px;
+}
+.filter-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+}
+.filter-toggle-btn:hover {
+  color: var(--text-primary);
+}
+.filter-toggle-btn.active {
+  background: var(--orange-gradient);
+  color: white;
+  box-shadow: var(--sku-btn-primary-shadow);
+}
+.badge-count {
+  background: #ef4444;
+  color: white;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 10px;
+  line-height: 1;
+}
+.filter-toggle-btn.active .badge-count {
+  background: white;
+  color: var(--orange-accent);
+}
+.tile-pending-tag {
+  font-size: 9px;
+  font-weight: 800;
+  color: #d97706;
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 .tile-grid {

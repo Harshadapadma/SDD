@@ -3,6 +3,10 @@ import api from '../api/client'
 
 // ─── Shared singleton state ───────────────────────────────────
 const notifications  = ref<any[]>([])
+const hasPendingRequests   = ref(false)
+const pendingRequestsCount = ref(0)
+const hasUnreadClarifications   = ref(false)
+const unreadClarificationsCount = ref(0)
 const isMuted        = ref(localStorage.getItem('notif_muted')       === 'true')
 const isSoundMuted   = ref(localStorage.getItem('notif_sound_muted') === 'true')
 const toasts         = ref<any[]>([])   // active toast popups
@@ -40,8 +44,25 @@ export function useNotifications() {
   // ─── Derived ─────────────────────────────────────────────────
   const unreadCount = computed(() => notifications.value.filter(n => !n.is_read).length)
 
+  // ─── Fetch Pending Requests & Unread Clarifications ─────────
+  async function fetchPendingRequestsCount() {
+    try {
+      const res = await api.get('workflows/pending-count/')
+      pendingRequestsCount.value = res.data.pending_count || 0
+      hasPendingRequests.value   = Boolean(res.data.has_pending)
+      unreadClarificationsCount.value = res.data.unread_clarifications_count || 0
+      hasUnreadClarifications.value   = Boolean(res.data.has_unread_clarifications)
+    } catch (_) {
+      hasPendingRequests.value   = false
+      pendingRequestsCount.value = 0
+      hasUnreadClarifications.value   = false
+      unreadClarificationsCount.value = 0
+    }
+  }
+
   // ─── Fetch & detect new ──────────────────────────────────────
   async function fetchNotifications() {
+    fetchPendingRequestsCount()
     try {
       const res = await api.get('notifications/')
       const fetched: any[] = res.data
@@ -163,6 +184,9 @@ export function useNotifications() {
 
   return {
     notifications, unreadCount, isMuted, isSoundMuted, toasts,
+    hasPendingRequests, pendingRequestsCount,
+    hasUnreadClarifications, unreadClarificationsCount,
+    fetchPendingRequestsCount,
     fetchNotifications, startPolling, stopPolling,
     markRead, markAllRead, toggleMute, toggleSoundMute, dismissToast,
     notify,

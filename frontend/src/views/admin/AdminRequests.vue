@@ -193,7 +193,7 @@
                 </div>
                 <div class="split-right">
                   <h3><i class="fas fa-comments"></i> Clarification History</h3>
-                  <div class="chat-messages-container">
+                  <div class="chat-messages-container" ref="chatMessagesRef">
                     <div v-if="loadingMessages" class="chat-loading"><i class="fas fa-spinner fa-spin"></i> Loading messages...</div>
                     <div v-else-if="messages.length === 0" class="chat-empty">No clarifications requested yet.</div>
                     <div v-else class="chat-bubble-list">
@@ -220,17 +220,30 @@
               <span v-if="confirmModal.action === 'APPROVE'">
                 This will <strong>apply the following edits</strong> to record <strong>{{ confirmModal.req.record_id }}</strong>:
               </span>
-              <span v-else>
+              <span v-else-if="confirmModal.action === 'REJECT'">
                 This will <strong>reject</strong> the proposed edits for record <strong>{{ confirmModal.req.record_id }}</strong>.
+              </span>
+              <span v-else>
+                Reviewing proposed changes for record <strong>{{ confirmModal.req.record_id }}</strong>:
               </span>
               <div class="diff-table-container">
                 <table class="diff-table">
-                  <thead><tr><th>Field</th><th>Current Value</th><th>Proposed Value</th></tr></thead>
+                  <thead>
+                    <tr>
+                      <th>Field</th>
+                      <th>Current Value</th>
+                      <th>Proposed Value</th>
+                    </tr>
+                  </thead>
                   <tbody>
                     <tr v-for="(val, key) in getProposedChanges(confirmModal.req)" :key="key">
                       <td class="field-name">{{ formatFieldName(key) }}</td>
-                      <td class="old-val">{{ confirmModal.req.current_data?.[key] || '—' }}</td>
-                      <td class="new-val">{{ val || '—' }}</td>
+                      <td class="old-val">
+                        <span class="diff-badge old">{{ confirmModal.req.current_data?.[key] || '—' }}</span>
+                      </td>
+                      <td class="new-val">
+                        <span class="diff-badge new">{{ val || '—' }}</span>
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -270,11 +283,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import api from '../../api/client'
 import { useNotifications } from '../../composables/useNotifications'
 
-const { notify } = useNotifications()
+const { notify, fetchNotifications } = useNotifications()
+const chatMessagesRef = ref<HTMLDivElement | null>(null)
 const requests  = ref<any[]>([])
 const loading   = ref(false)
 const reviewing = ref<string | null>(null)
@@ -353,11 +367,20 @@ const messages        = ref<any[]>([])
 const newMessage      = ref('')
 const loadingMessages = ref(false)
 
+function scrollToBottom() {
+  nextTick(() => {
+    if (chatMessagesRef.value) {
+      chatMessagesRef.value.scrollTop = chatMessagesRef.value.scrollHeight
+    }
+  })
+}
+
 async function fetchMessages(reqId: number) {
   loadingMessages.value = true
   try {
     const res = await api.get(`workflows/creation/${reqId}/clarification/`)
     messages.value = res.data
+    scrollToBottom()
   } catch (e) { console.error(e) }
   finally { loadingMessages.value = false }
 }
@@ -368,6 +391,7 @@ async function sendMessage(reqId: number) {
     const res = await api.post(`workflows/creation/${reqId}/clarification/`, { message: newMessage.value.trim() })
     messages.value.push(res.data)
     newMessage.value = ''
+    scrollToBottom()
   } catch (e) { console.error(e) }
 }
 
@@ -407,6 +431,7 @@ async function doReview() {
     )
     confirmModal.value = null
     fetchRequests()
+    fetchNotifications()
   } catch (e) {
     console.error(e)
     notify('Review Failed', 'Failed to process request.', 'ERROR')
@@ -793,16 +818,17 @@ onMounted(fetchRequests)
 }
 
 /* Split Review View */
-.split-view { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 16px; min-height: 360px; max-height: 50vh; }
+.split-view { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 16px; min-height: 380px; max-height: 55vh; }
 .split-left { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; padding-right: 6px; }
 .split-right {
   display: flex; flex-direction: column; gap: 10px;
   background: var(--bg-content); border: 1px solid rgba(166, 169, 173, 0.4);
   border-radius: var(--radius-xl); padding: 14px; height: 100%; box-shadow: var(--neu-inset);
+  box-sizing: border-box; justify-content: space-between;
 }
-.split-right h3 { font-size: var(--text-xs); margin: 0 0 4px; font-weight: var(--weight-bold); color: var(--text-primary); }
-.chat-messages-container { flex: 1; overflow-y: auto; max-height: 240px; display: flex; flex-direction: column; gap: 8px; }
-.chat-loading, .chat-empty { text-align: center; padding: 24px 8px; color: var(--text-muted); font-size: var(--text-xs); }
+.split-right h3 { font-size: var(--text-xs); margin: 0 0 4px; font-weight: var(--weight-bold); color: var(--text-primary); flex-shrink: 0; }
+.chat-messages-container { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px; }
+.chat-loading, .chat-empty { text-align: center; margin: auto; padding: 24px 8px; color: var(--text-muted); font-size: var(--text-xs); }
 .chat-bubble-list { display: flex; flex-direction: column; gap: 8px; }
 .chat-bubble-wrap { display: flex; flex-direction: column; }
 .chat-bubble-wrap.me { align-items: flex-end; }
@@ -825,7 +851,10 @@ onMounted(fetchRequests)
 }
 .bubble-time { font-size: 9px; color: var(--text-muted); margin-top: 2px; }
 
-.chat-input-wrap { display: flex; gap: 6px; padding-top: 8px; border-top: 1px solid rgba(166, 169, 173, 0.4); }
+.chat-input-wrap {
+  display: flex; gap: 6px; padding-top: 10px; border-top: 1px solid rgba(166, 169, 173, 0.4);
+  margin-top: auto; flex-shrink: 0;
+}
 .chat-input-wrap textarea {
   flex: 1; min-height: 36px; max-height: 80px; resize: none;
   background: var(--bg-input); border: 1px solid rgba(166, 169, 173, 0.55);
@@ -843,7 +872,7 @@ onMounted(fetchRequests)
 .chat-closed-notice {
   padding: 8px 12px; border-radius: var(--radius-md); background: var(--neutral-100);
   color: var(--text-muted); font-size: var(--text-xs); font-weight: var(--weight-semibold);
-  display: flex; align-items: center; gap: 6px;
+  display: flex; align-items: center; gap: 6px; margin-top: auto; flex-shrink: 0;
 }
 
 .viewer-warning-banner {
@@ -869,6 +898,72 @@ onMounted(fetchRequests)
 .viewer-warning-banner p {
   margin: 4px 0 0;
   font-weight: 500;
+}
+
+/* Diff Table Styling */
+.diff-table-container {
+  margin-top: 14px;
+  background: var(--bg-content);
+  border: 1px solid rgba(166, 169, 173, 0.4);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: var(--neu-inset);
+}
+.diff-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--text-xs);
+  text-align: left;
+}
+.diff-table th {
+  background: var(--bg-base);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(166, 169, 173, 0.35);
+}
+.diff-table td {
+  padding: 12px 14px;
+  border-bottom: 1px dashed rgba(166, 169, 173, 0.25);
+  vertical-align: middle;
+}
+.diff-table tr:last-child td {
+  border-bottom: none;
+}
+.diff-table .field-name {
+  font-weight: 700;
+  color: var(--text-primary);
+  width: 28%;
+}
+.diff-table .old-val, .diff-table .new-val {
+  width: 36%;
+}
+.diff-badge {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  word-break: break-word;
+  max-width: 100%;
+  line-height: 1.4;
+}
+.diff-badge.old {
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  color: #991b1b;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  text-decoration: line-through;
+  font-weight: 600;
+}
+.diff-badge.new {
+  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  color: #166534;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  font-weight: 700;
+  box-shadow: 0 1px 4px rgba(34, 197, 94, 0.15);
 }
 
 @media (max-width: 800px) { .split-view { grid-template-columns: 1fr; } }

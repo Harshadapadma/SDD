@@ -15,12 +15,20 @@
 
         <div class="lock-body">
           <div class="lock-user-card" v-if="user">
-            <div class="avatar-circle-lock">{{ (user.name || 'U').charAt(0).toUpperCase() }}</div>
-            <div class="lock-user-info">
-              <div class="user-name-lock">{{ user.name }}</div>
-              <div class="user-email-lock">{{ user.email }}</div>
-              <span class="user-role-chip">{{ user.role }}</span>
+            <div class="lock-user-left">
+              <div class="avatar-circle-lock">{{ (user.name || 'U').charAt(0).toUpperCase() }}</div>
+              <div class="lock-user-info">
+                <div class="user-name-lock">{{ user.name }}</div>
+                <div class="user-email-lock">
+                  <i class="fas fa-envelope"></i>
+                  <span>{{ user.email }}</span>
+                </div>
+              </div>
             </div>
+            <span :class="['user-role-chip', (user.role || '').toLowerCase()]">
+              <i :class="['fas', roleIcon(user.role)]"></i>
+              {{ formatRole(user.role) }}
+            </span>
           </div>
 
           <form @submit.prevent="verifyUnlock" class="unlock-form">
@@ -78,6 +86,24 @@ const showPassword = ref(false)
 const unlocking = ref(false)
 const unlockError = ref('')
 const passwordInput = ref<HTMLInputElement | null>(null)
+
+function formatRole(role: string): string {
+  if (!role) return ''
+  const r = role.toUpperCase()
+  if (r === 'COMPLIANCE_OFFICER') return 'Compliance Officer'
+  if (r === 'COLLABORATOR') return 'Collaborator'
+  if (r === 'VIEWER') return 'Viewer'
+  if (r === 'ADMIN') return 'Administrator'
+  return role.charAt(0).toUpperCase() + role.slice(1).toLowerCase()
+}
+
+function roleIcon(role: string): string {
+  if (!role) return 'fa-user'
+  const r = role.toUpperCase()
+  if (r === 'COMPLIANCE_OFFICER' || r === 'ADMIN') return 'fa-shield-halved'
+  if (r === 'COLLABORATOR') return 'fa-user-pen'
+  return 'fa-eye'
+}
 
 watch(isLocked, (val) => {
   if (val) {
@@ -205,32 +231,106 @@ onUnmounted(() => {
 
 .lock-user-card {
   background: #FFFFFF;
-  border-radius: 18px;
-  padding: 14px 16px;
+  border-radius: 20px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid rgba(166, 169, 173, 0.35);
+  box-shadow: 0 4px 16px rgba(35, 28, 20, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.lock-user-left {
   display: flex;
   align-items: center;
   gap: 14px;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  min-width: 0;
 }
 
 .avatar-circle-lock {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
   background: var(--orange-gradient);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 19px;
   font-weight: 800;
-  box-shadow: var(--sku-btn-primary-shadow);
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.3);
+  border: 2px solid #FFFFFF;
+  flex-shrink: 0;
 }
 
-.lock-user-info { display: flex; flex-direction: column; gap: 2px; }
-.user-name-lock { font-size: 13px; font-weight: 800; color: var(--text-primary); }
-.user-email-lock { font-size: 11px; color: var(--text-muted); }
+.lock-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.user-name-lock {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-email-lock {
+  font-size: 11px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-email-lock i {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.user-role-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  flex-shrink: 0;
+}
+
+.user-role-chip.compliance_officer,
+.user-role-chip.admin {
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+  color: #c2410c;
+  border: 1px solid rgba(234, 88, 12, 0.35);
+  box-shadow: 0 2px 6px rgba(234, 88, 12, 0.12);
+}
+
+.user-role-chip.collaborator {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  color: #1d4ed8;
+  border: 1px solid rgba(29, 78, 216, 0.3);
+  box-shadow: 0 2px 6px rgba(29, 78, 216, 0.1);
+}
+
+.user-role-chip.viewer {
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  color: #475569;
+  border: 1px solid rgba(71, 85, 105, 0.3);
+  box-shadow: 0 2px 6px rgba(71, 85, 105, 0.08);
+}
 
 .unlock-form { display: flex; flex-direction: column; gap: 14px; }
 

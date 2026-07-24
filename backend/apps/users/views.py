@@ -15,7 +15,7 @@ from django.db.models import Q
 from django.core.mail import send_mail
 from django.conf import settings
 
-from .email_templates import get_account_created_email, get_password_reset_email, send_sdd_email
+from .email_templates import get_account_created_email, get_password_reset_email, get_mfa_otp_email, send_sdd_email
 from .models import User
 from .serializers import (
     LoginSerializer,
@@ -61,7 +61,7 @@ def _delete_refresh_cookie(response):
 # ─── OTP Email ──────────────────────────────────────────────────────────────
 def _send_mfa_otp_email(user, otp_code: str):
     """Send MFA OTP code to user's email."""
-    subject = "Negen SDD — Your Verification Code"
+    subject, html_body = get_mfa_otp_email(user.name, user.email, otp_code)
     message = (
         f"Hello {user.name},\n\n"
         f"Your one-time verification code is: {otp_code}\n\n"
@@ -74,7 +74,7 @@ def _send_mfa_otp_email(user, otp_code: str):
             subject=subject,
             message=message,
             recipient_list=[user.email],
-            html_message=None,
+            html_message=html_body,
             fail_silently=False,
         )
     except Exception as e:
@@ -407,11 +407,14 @@ class CreateUserView(APIView):
                     html_message=html_body,
                     fail_silently=False,
                 )
+                log_security_event('ACTIVATION_SENT', request, user, f'Account creation activation email sent to {user.email}')
             except Exception as e:
-                print(f"Failed to send email: {e}")
+                log_security_event('EMAIL_FAILED', request, user, f'Failed to send account creation email: {e}', level='ERROR')
+                print(f"[CreateUserView] Failed to send email to {user.email}: {e}")
 
             return Response({
                 "message": "User created successfully",
+                "setup_url": frontend_url,
                 "user": {
                     "public_id": user.public_id,
                     "email": user.email,
@@ -421,6 +424,72 @@ class CreateUserView(APIView):
             }, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# -------------------------------
+# Resend Activation Email View
+# -------------------------------
+class ResendActivationView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if request.user.role != "ADMIN":
+            return Response(
+                {"error": "Only admin can resend activation emails."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        email = request.data.get('email', '').strip().lower()
+        public_id = request.data.get('public_id', '').strip()
+
+        user = None
+        if public_id:
+            user = User.objects.filter(public_id=public_id).first()
+        elif email:
+            user = User.objects.filter(email__iexact=email).first()
+
+        if not user:
+            return Response(
+                {"error": "User not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if user.is_active:
+            return Response(
+                {"error": "User account is already active."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+        frontend_url = f"{settings.FRONTEND_URL}/set-password?uid={uid}&token={token}"
+
+        try:
+            subject, html_body = get_account_created_email(
+                name=user.name,
+                email=user.email,
+                role=user.role,
+                public_id=user.public_id,
+                setup_url=frontend_url,
+            )
+            send_sdd_email(
+                subject=subject,
+                message=f"Hello {user.name},\n\nYour account activation link: {frontend_url}",
+                recipient_list=[user.email],
+                html_message=html_body,
+                fail_silently=False,
+            )
+            log_security_event('ACTIVATION_RESENT', request, user, f'Activation email resent to {user.email}')
+            return Response({
+                "message": f"Activation email resent successfully to {user.email}.",
+                "setup_url": frontend_url
+            })
+        except Exception as e:
+            log_security_event('EMAIL_FAILED', request, user, f'Failed to resend activation email: {e}', level='ERROR')
+            return Response(
+                {"error": f"Failed to send email: {str(e)}", "setup_url": frontend_url},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 # -------------------------------

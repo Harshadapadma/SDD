@@ -38,7 +38,10 @@
             @click="selectRequest(req)"
           >
             <div class="item-header">
-              <span class="pub-id">{{ req.record_id || 'Pending ID' }}</span>
+              <span class="pub-id">
+                {{ req.record_id || 'Pending ID' }}
+                <span class="chat-red-dot" v-if="req.has_unread" title="New clarification message"></span>
+              </span>
               <span :class="['status-chip', req.status.toLowerCase()]">{{ req.status }}</span>
             </div>
             <div class="item-name">{{ req.record_name }}</div>
@@ -200,7 +203,7 @@
               </div>
               <div class="form-group">
                 <label>Date Received *</label>
-                <input type="date" v-model="editForm.info_received_date" :max="todayDate" />
+                <CustomDatePicker v-model="editForm.info_received_date" :max="todayDate" />
               </div>
               <div class="form-group">
                 <label>Disclosure Name *</label>
@@ -240,8 +243,9 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '../../api/client'
 import { useNotifications } from '../../composables/useNotifications'
+import CustomDatePicker from '../../components/CustomDatePicker.vue'
 
-const { notify } = useNotifications()
+const { notify, fetchNotifications } = useNotifications()
 const route = useRoute()
 
 const user = JSON.parse(localStorage.getItem('user') || '{}')
@@ -345,11 +349,13 @@ async function fetchRequests() {
 
 async function selectRequest(req: any) {
   selectedRequest.value = req
+  req.has_unread = false
   loadingMessages.value = true
   messages.value = []
   try {
     const res = await api.get(`workflows/creation/${req.id}/clarification/`)
     messages.value = res.data
+    fetchNotifications()
     scrollToBottom()
   } catch (e) {
     console.error('Failed to fetch messages:', e)
@@ -370,7 +376,8 @@ function openEdit() {
     info_details: data.info_details || '',
     info_received_date: data.info_received_date || '',
     disclosure_name: data.disclosure_name || '',
-    disclosure_designation: data.disclosure_designation || ''
+    disclosure_designation: data.disclosure_designation || '',
+    disclosure_department: data.disclosure_department || ''
   }
   editError.value = ''
   showEditModal.value = true
@@ -575,7 +582,21 @@ onMounted(fetchRequests)
 }
 
 .item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-.pub-id { font-family: monospace; font-size: 11px; font-weight: var(--weight-bold); color: var(--orange-accent); }
+.pub-id { font-family: monospace; font-size: 11px; font-weight: var(--weight-bold); color: var(--orange-accent); display: inline-flex; align-items: center; gap: 4px; }
+.chat-red-dot {
+  width: 8px;
+  height: 8px;
+  background-color: #ef4444;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 0 2px var(--bg-card), 0 0 8px rgba(239, 68, 68, 0.8);
+  animation: pulse-red-dot 1.8s infinite ease-in-out;
+}
+@keyframes pulse-red-dot {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+  70% { transform: scale(1.15); box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
 .status-chip {
   padding: 1px 6px; border-radius: var(--radius-pill); font-size: 9px; font-weight: var(--weight-bold); text-transform: uppercase;
 }

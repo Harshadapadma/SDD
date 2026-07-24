@@ -95,12 +95,12 @@ def send_sdd_email(
     subject: str,
     message: str,
     recipient_list: list[str],
-    html_message: str,
+    html_message: str = None,
     from_email: str = None,
     fail_silently: bool = False
 ) -> bool:
     """
-    Sends an HTML email with Negen SDD logo attached as an inline CID image (cid:negen_logo).
+    Sends an HTML/text email with Negen SDD logo attached as an inline CID image (cid:negen_logo).
     This guarantees that Gmail, Outlook, Apple Mail, etc. display the logo natively without blocking it.
     """
     if from_email is None:
@@ -113,12 +113,12 @@ def send_sdd_email(
         to=recipient_list
     )
 
-    # Convert data URI to cid:negen_logo for real email delivery
-    html_to_send = html_message
-    if LOGO_DATA_URI and LOGO_DATA_URI in html_to_send:
-        html_to_send = html_to_send.replace(LOGO_DATA_URI, "cid:negen_logo")
+    if html_message:
+        html_to_send = html_message
+        if LOGO_DATA_URI and LOGO_DATA_URI in html_to_send:
+            html_to_send = html_to_send.replace(LOGO_DATA_URI, "cid:negen_logo")
 
-    msg.attach_alternative(html_to_send, "text/html")
+        msg.attach_alternative(html_to_send, "text/html")
 
     # Attach inline logo image with Content-ID <negen_logo>
     logo_path = get_logo_file_path()
@@ -546,3 +546,93 @@ def get_password_changed_email(name: str, email: str, timestamp_str: str) -> tup
 </html>"""
 
     return subject, html
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TEMPLATE 4 — Two-Factor Authentication (MFA OTP) Code Email
+# ══════════════════════════════════════════════════════════════════════════════
+def get_mfa_otp_email(name: str, email: str, otp_code: str) -> tuple[str, str]:
+    """Returns (subject, html_body) for MFA Verification OTP email."""
+    subject = "Negen SDD — Your Verification Code"
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Verification Code</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F9F8F5;font-family:'Inter', -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;-webkit-font-smoothing:antialiased;">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F9F8F5;padding:40px 16px;">
+<tr><td align="center">
+<table width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;">
+
+  <!-- HEADER -->
+  <tr>
+    <td style="background:linear-gradient(135deg, #fb923c 0%, #ea6c00 55%, #c2570a 100%);border-radius:20px 20px 0 0;padding:28px 32px;box-shadow:0 4px 20px rgba(234,108,0,0.25);">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td style="vertical-align:middle;">
+            <table cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding-right:14px;vertical-align:middle;">{_logo_img(48, 12)}</td>
+                <td style="vertical-align:middle;">
+                  <div style="font-size:20px;font-weight:800;color:#ffffff;letter-spacing:-0.4px;line-height:1.2;">Negen SDD</div>
+                  <div style="font-size:10px;color:rgba(255,255,255,0.85);letter-spacing:1.5px;text-transform:uppercase;font-weight:600;margin-top:2px;">Two-Factor Authentication</div>
+                </td>
+              </tr>
+            </table>
+          </td>
+          <td align="right" style="vertical-align:middle;">
+            <span style="background:rgba(255,255,255,0.22);border:1px solid rgba(255,255,255,0.4);color:#ffffff;font-size:10px;font-weight:700;padding:4px 12px;border-radius:99px;letter-spacing:1px;text-transform:uppercase;">
+              OTP CODE
+            </span>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- BODY -->
+  <tr>
+    <td style="background:#ffffff;border-left:1px solid #E0D8CC;border-right:1px solid #E0D8CC;padding:32px 32px 28px;">
+      <div style="font-size:18px;font-weight:800;color:#1f2937;margin-bottom:6px;">Verification Code</div>
+      <div style="font-size:13px;color:#6b7585;line-height:1.5;margin-bottom:24px;">
+        Hello <strong>{name}</strong>,<br/>Use the one-time password (OTP) below to complete your login to Negen SDD.
+      </div>
+
+      <!-- OTP CODE BADGE -->
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F9F8F5;border:1px solid #E0D8CC;border-radius:14px;margin-bottom:24px;">
+        <tr>
+          <td align="center" style="padding:28px 20px;">
+            <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;color:#9aa3b8;text-transform:uppercase;margin-bottom:10px;">ONE-TIME VERIFICATION CODE</div>
+            <div style="font-family:'Courier New', Consolas, monospace;font-size:36px;font-weight:800;letter-spacing:8px;color:#ea6c00;background:#ffffff;border:1px solid #E0D8CC;display:inline-block;padding:12px 28px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+              {otp_code}
+            </div>
+            <div style="font-size:12px;color:#6b7585;margin-top:12px;">This code is valid for <strong>5 minutes</strong>.</div>
+          </td>
+        </tr>
+      </table>
+
+      <!-- SECURITY NOTICE -->
+      <div style="font-size:12px;color:#6b7585;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;line-height:1.4;">
+        If you did not request this login, please change your password immediately or contact your system administrator.
+      </div>
+    </td>
+  </tr>
+
+  <!-- FOOTER -->
+  <tr>
+    <td style="background:#F9F8F5;border:1px solid #E0D8CC;border-top:none;border-radius:0 0 20px 20px;padding:20px 32px;text-align:center;">
+      <div style="font-size:11px;color:#6b7585;font-weight:600;">
+        &copy; Negen SDD &bull; Secure Document Dissemination Platform
+      </div>
+    </td>
+  </tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>"""
+    return subject, html
+

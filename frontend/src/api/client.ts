@@ -1,4 +1,5 @@
 import axios from "axios";
+import { useInactivityLock } from "../composables/useInactivityLock";
 
 const api = axios.create({
   baseURL: "http://127.0.0.1:8000/api/",
@@ -33,6 +34,11 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+
+    // Do not attempt token refresh for login/auth endpoints
+    if (originalRequest.url?.includes('auth/login') || originalRequest.url?.includes('auth/token/refresh')) {
+      return Promise.reject(error);
+    }
 
     // Check if error is 401 Unauthorized and not already retried
     if (error.response?.status === 401 && !originalRequest._retry) {
@@ -71,10 +77,21 @@ api.interceptors.response.use(
         processQueue(refreshError, null);
         isRefreshing = false;
 
-        // Clear auth data and redirect to login
-        localStorage.removeItem("access");
-        localStorage.removeItem("user");
-        window.location.href = "/login";
+        const { checkInactivityExpired, lockSession } = useInactivityLock();
+        const userExists = Boolean(localStorage.getItem("user"));
+
+        if (userExists && checkInactivityExpired()) {
+          // If inactivity limit (15 mins) has passed, trigger lock screen instead of hard logout
+          lockSession();
+        } else if (userExists) {
+          // If user exists and is active but refresh failed, trigger lock session to re-authenticate cleanly
+          lockSession();
+        } else {
+          // No user session stored, redirect to login
+          localStorage.removeItem("access");
+          localStorage.removeItem("user");
+          window.location.href = "/login";
+        }
         return Promise.reject(refreshError);
       }
     }

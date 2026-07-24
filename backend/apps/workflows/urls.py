@@ -7,10 +7,14 @@ from .views import (
     CreationRequestListView, ReviewCreationRequestView,
     EditRequestListView, ReviewEditRequestView,
     AuditLogView,
-    CreationRequestClarificationView, MyClarificationsListView
+    CreationRequestClarificationView, MyClarificationsListView,
+    PendingRequestCountView
 )
 
 urlpatterns = [
+    # Pending Count for Red Dot
+    path('pending-count/', PendingRequestCountView.as_view()),
+
     # Clarifications
     path('clarifications/', MyClarificationsListView.as_view()),
     path('creation/<int:request_id>/clarification/', CreationRequestClarificationView.as_view()),

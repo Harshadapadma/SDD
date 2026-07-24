@@ -86,17 +86,31 @@ class RecordListView(APIView):
 
     def get(self, request):
         user = request.user
+        status_filter = request.GET.get('status', 'APPROVED').upper()
 
-        # 🔐 ACCESS CONTROL
-        if user.role == "COMPLIANCE_OFFICER":
-            queryset = Record.objects.all()
-        elif user.role == "ADMIN":
+        if user.role == "ADMIN":
             return Response({"error": "Permission denied. Admins cannot view records."}, status=status.HTTP_403_FORBIDDEN)
-        else:
-            queryset = Record.objects.filter(
-                Q(user_access__user=user, status='APPROVED') |
-                Q(created_by=user, status='PENDING_CREATION')
-            )
+
+        # 🔐 ACCESS CONTROL & STATUS FILTERING
+        if user.role == "COMPLIANCE_OFFICER":
+            if status_filter == "PENDING":
+                queryset = Record.objects.filter(status='PENDING_CREATION')
+            elif status_filter == "ALL":
+                queryset = Record.objects.exclude(status='REJECTED')
+            else:
+                queryset = Record.objects.filter(status='APPROVED')
+        elif user.role == "VIEWER":
+            queryset = Record.objects.filter(user_access__user=user, status='APPROVED')
+        else: # COLLABORATOR
+            if status_filter == "PENDING":
+                queryset = Record.objects.filter(created_by=user, status='PENDING_CREATION')
+            elif status_filter == "ALL":
+                queryset = Record.objects.filter(
+                    Q(user_access__user=user, status='APPROVED') |
+                    Q(created_by=user, status='PENDING_CREATION')
+                )
+            else:
+                queryset = Record.objects.filter(user_access__user=user, status='APPROVED')
 
         queryset = queryset.order_by('-created_at')
 
@@ -106,7 +120,8 @@ class RecordListView(APIView):
             queryset = queryset.filter(
                 Q(name__icontains=search) |
                 Q(pan__icontains=search) |
-                Q(public_id__icontains=search)
+                Q(public_id__icontains=search) |
+                Q(employee_code__icontains=search)
             )
 
         # 📄 Pagination
@@ -247,7 +262,15 @@ class UpdateRecordView(APIView):
         )
 
         if serializer.is_valid():
-            # Create Edit Request instead of saving directly
+            # If updated by ADMIN or COMPLIANCE_OFFICER, apply changes directly
+            if user.role in ["ADMIN", "COMPLIANCE_OFFICER"]:
+                serializer.save(updated_by=user)
+                return Response({
+                    "message": "Record updated successfully",
+                    "record_id": record.public_id
+                })
+
+            # For Collaborators, create Edit Request instead of saving directly
             EditRequest.objects.create(
                 record=record,
                 requested_by=user,
@@ -260,14 +283,14 @@ class UpdateRecordView(APIView):
                 Notification.objects.create(
                     user=officer,
                     title="Record Edit Request",
-                    message=f"{user.name} requested edit of record {record.public_id}",
-                    type="WARNING"
+                    message=f"{user.name} requested edits for record {record.public_id}",
+                    type="INFO"
                 )
 
             return Response({
-                "message": "Record edit request submitted for approval"
+                "message": "Edit request submitted for approval",
+                "record_id": record.public_id
             })
-
         return Response(serializer.errors, status=400)
 
 
@@ -283,25 +306,32 @@ class DeleteRecordView(APIView):
         except Record.DoesNotExist:
             return Response({"error": "Record not found"}, status=404)
 
+        user = request.user
+
+        if user.role not in ["ADMIN", "COMPLIANCE_OFFICER", "COLLABORATOR"]:
+            return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+
+        # Compliance Officer or Admin: Delete immediately!
+        if user.role in ["ADMIN", "COMPLIANCE_OFFICER"]:
+            record.delete()
+            return Response({"message": "Record deleted successfully"}, status=status.HTTP_200_OK)
+
         if record.status != 'APPROVED':
             return Response(
                 {"error": "Cannot request deletion of an unapproved record"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        user = request.user
+        has_access = RecordAccess.objects.filter(
+            user=user,
+            record=record,
+            access_type="EDIT"
+        ).exists()
+        if not has_access:
+            return Response({"error": "No delete permission"}, status=status.HTTP_403_FORBIDDEN)
 
-        if user.role not in ["ADMIN", "COLLABORATOR"]:
-            return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
-
-        if user.role == "COLLABORATOR":
-            has_access = RecordAccess.objects.filter(
-                user=user,
-                record=record,
-                access_type="EDIT"
-            ).exists()
-            if not has_access:
-                return Response({"error": "No delete permission"}, status=status.HTTP_403_FORBIDDEN)
+        if DeleteRequest.objects.filter(record=record, status='PENDING').exists():
+            return Response({"error": "A deletion request is already pending for this record"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Create Delete Request
         DeleteRequest.objects.create(record=record, requested_by=user)

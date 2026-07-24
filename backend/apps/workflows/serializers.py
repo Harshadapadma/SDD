@@ -55,6 +55,7 @@ class CreationRequestSerializer(serializers.ModelSerializer):
     record_name = serializers.SerializerMethodField()
     requested_by = serializers.CharField(source="requested_by.name", read_only=True)
     current_data = serializers.SerializerMethodField()
+    has_unread = serializers.SerializerMethodField()
 
     class Meta:
         model = CreationRequest
@@ -65,8 +66,19 @@ class CreationRequestSerializer(serializers.ModelSerializer):
             "requested_by",
             "status",
             "current_data",
+            "has_unread",
             "created_at"
         ]
+
+    def get_has_unread(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user or not request.user.is_authenticated:
+            return False
+        user = request.user
+        if user.role in ['COMPLIANCE_OFFICER', 'ADMIN']:
+            return obj.clarification_messages.exclude(sender__role='COMPLIANCE_OFFICER').filter(is_read=False).exists()
+        else:
+            return obj.clarification_messages.exclude(sender=user).filter(is_read=False).exists()
 
     def get_record_id(self, obj):
         if obj.record_public_id:

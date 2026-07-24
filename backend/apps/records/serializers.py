@@ -141,7 +141,8 @@ class RecordListSerializer(serializers.ModelSerializer):
             "info_received_date",
             "created_by",
             "created_at",
-            "access_type"
+            "access_type",
+            "status"
         ]
 
     def get_access_type(self, obj):
@@ -150,8 +151,8 @@ class RecordListSerializer(serializers.ModelSerializer):
             return None
         user = request.user
         
-        if user.role == 'ADMIN':
-            return 'EDIT' # Admins have full access
+        if user.role in ['ADMIN', 'COMPLIANCE_OFFICER']:
+            return 'EDIT' # Admins and Compliance Officers have full access
             
         if user.role == 'VIEWER':
             return 'VIEW' # Viewers always have View Only access
@@ -183,7 +184,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if not request or not request.user or not request.user.is_authenticated: return None
         user = request.user
-        if user.role == 'ADMIN': return 'EDIT'
+        if user.role in ['ADMIN', 'COMPLIANCE_OFFICER']: return 'EDIT'
         if user.role == 'VIEWER': return 'VIEW'
         from .models import RecordAccess
         access = RecordAccess.objects.filter(record=obj, user=user).first()

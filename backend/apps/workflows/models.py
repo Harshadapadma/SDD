@@ -154,6 +154,7 @@ class ClarificationMessage(models.Model):
         related_name='sent_clarification_messages'
     )
     message = models.TextField()
+    is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

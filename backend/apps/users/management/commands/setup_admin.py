@@ -15,7 +15,8 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING('ADMIN_EMAIL or ADMIN_PASSWORD not set in .env. Skipping admin setup.'))
             return
 
-        if not User.objects.filter(email=admin_email).exists():
+        user = User.objects.filter(email=admin_email).first()
+        if not user:
             self.stdout.write(f'Creating superuser: {admin_email}...')
             User.objects.create_superuser(
                 email=admin_email,
@@ -24,7 +25,14 @@ class Command(BaseCommand):
             )
             self.stdout.write(self.style.SUCCESS(f'Successfully created admin account: {admin_email}'))
         else:
-            self.stdout.write(self.style.SUCCESS(f'Admin account {admin_email} already exists.'))
+            self.stdout.write(f'Updating superuser: {admin_email}...')
+            user.name = admin_name
+            user.set_password(admin_password)
+            user.role = UserRole.ADMIN
+            user.is_staff = True
+            user.is_superuser = True
+            user.save()
+            self.stdout.write(self.style.SUCCESS(f'Successfully updated admin account: {admin_email}'))
 
         # Seed Compliance Officer
         comp_email = os.getenv('COMPLIANCE_EMAIL')
@@ -32,7 +40,8 @@ class Command(BaseCommand):
         comp_name = os.getenv('COMPLIANCE_NAME', 'Compliance Officer')
 
         if comp_email and comp_password:
-            if not User.objects.filter(email=comp_email).exists():
+            comp_user = User.objects.filter(email=comp_email).first()
+            if not comp_user:
                 self.stdout.write(f'Creating compliance officer: {comp_email}...')
                 User.objects.create_user(
                     email=comp_email,
@@ -43,5 +52,11 @@ class Command(BaseCommand):
                 )
                 self.stdout.write(self.style.SUCCESS(f'Successfully created compliance officer account: {comp_email}'))
             else:
-                self.stdout.write(self.style.SUCCESS(f'Compliance officer account {comp_email} already exists.'))
+                self.stdout.write(f'Updating compliance officer: {comp_email}...')
+                comp_user.name = comp_name
+                comp_user.set_password(comp_password)
+                comp_user.role = UserRole.COMPLIANCE_OFFICER
+                comp_user.is_active = True
+                comp_user.save()
+                self.stdout.write(self.style.SUCCESS(f'Successfully updated compliance officer account: {comp_email}'))
 

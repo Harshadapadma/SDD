@@ -33,11 +33,17 @@
           <span v-if="!isCollapsed" class="nav-label">Records</span>
         </div>
         <div class="nav-item" :class="{ active: $route.path === '/requests' }" @click="$router.push('/requests')" title="Requests">
-          <i class="fas fa-paper-plane"></i>
+          <div class="nav-icon-wrap">
+            <i class="fas fa-paper-plane"></i>
+            <span class="red-dot" v-if="hasPendingRequests" title="Pending requests awaiting review"></span>
+          </div>
           <span v-if="!isCollapsed" class="nav-label">Requests</span>
         </div>
         <div class="nav-item" :class="{ active: $route.path === '/clarifications' }" @click="$router.push('/clarifications')" title="Clarifications">
-          <i class="fas fa-question-circle"></i>
+          <div class="nav-icon-wrap">
+            <i class="fas fa-question-circle"></i>
+            <span class="red-dot" v-if="hasUnreadClarifications" title="New clarification messages"></span>
+          </div>
           <span v-if="!isCollapsed" class="nav-label">Clarifications</span>
         </div>
       </nav>
@@ -237,6 +243,7 @@ async function fetchProfile() {
 
 const {
   notifications, unreadCount, isMuted, isSoundMuted, toasts,
+  hasPendingRequests, hasUnreadClarifications,
   startPolling, stopPolling,
   markRead, markAllRead, toggleMute, toggleSoundMute, dismissToast,
   typeIcon, formatTime,
@@ -449,6 +456,42 @@ onUnmounted(stopPolling)
   flex-shrink: 0;
   font-size: var(--text-sm);
   transition: color var(--duration-base);
+}
+
+.nav-icon-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.red-dot {
+  position: absolute;
+  top: -4px;
+  right: -5px;
+  width: 8px;
+  height: 8px;
+  background-color: #ef4444;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--bg-sidebar, #f9f8f6), 0 0 8px rgba(239, 68, 68, 0.7);
+  animation: redDotPulse 2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes redDotPulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  }
+  70% {
+    transform: scale(1.2);
+    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
 }
 
 .nav-label {

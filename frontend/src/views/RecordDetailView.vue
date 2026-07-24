@@ -25,11 +25,11 @@
       <!-- LEFT: MAIN INFO -->
       <div class="details-main">
         
-        <!-- CARD: SUBJECT INFO -->
+        <!-- CARD: RECORD DETAILS (Exact Form Fields & Labels) -->
         <div class="detail-card">
           <div class="card-header">
-            <div class="header-icon"><i class="fas fa-user-circle"></i></div>
-            <h3>Subject Information</h3>
+            <div class="header-icon"><i class="fas fa-file-shield"></i></div>
+            <h3>Record Details</h3>
           </div>
           <div class="card-body grid-2">
             <div class="info-group">
@@ -41,12 +41,12 @@
               <div class="info-val">{{ record.designation || '—' }}</div>
             </div>
             <div class="info-group">
-              <label>PAN Number</label>
-              <div class="info-val mono">{{ record.pan }}</div>
-            </div>
-            <div class="info-group">
               <label>Employee Code</label>
               <div class="info-val mono">{{ record.employee_code || '—' }}</div>
+            </div>
+            <div class="info-group">
+              <label>PAN Card Number</label>
+              <div class="info-val mono">{{ record.pan }}</div>
             </div>
             <div class="info-group">
               <label>Disclosure Company</label>
@@ -56,40 +56,23 @@
               <label>Date Received</label>
               <div class="info-val">{{ formatDate(record.info_received_date) }}</div>
             </div>
-          </div>
-        </div>
-
-        <!-- CARD: DISCLOSURE INFO -->
-        <div class="detail-card">
-          <div class="card-header">
-            <div class="header-icon"><i class="fas fa-file-signature"></i></div>
-            <h3>Disclosure Officer Details</h3>
-          </div>
-          <div class="card-body grid-2">
             <div class="info-group">
-              <label>Disclosure Officer Name</label>
+              <label>Disclosure Name</label>
               <div class="info-val">{{ record.disclosure_name || '—' }}</div>
             </div>
             <div class="info-group">
-              <label>Disclosure Officer Designation</label>
+              <label>Disclosure Designation</label>
               <div class="info-val">{{ record.disclosure_designation || '—' }}</div>
             </div>
             <div class="info-group">
-              <label>Disclosure Officer Department</label>
+              <label>Disclosure Department</label>
               <div class="info-val">{{ record.disclosure_department || '—' }}</div>
             </div>
-          </div>
-        </div>
-
-        <!-- CARD: INFO DETAILS (Large Text) -->
-        <div class="detail-card">
-          <div class="card-header">
-            <div class="header-icon"><i class="fas fa-circle-info"></i></div>
-            <h3>Detailed Disclosure Information</h3>
-          </div>
-          <div class="card-body">
-            <div class="info-text-box">
-              {{ record.info_details || 'No additional details provided.' }}
+            <div class="info-group full-width">
+              <label>Information Details</label>
+              <div class="info-text-box">
+                {{ record.info_details || 'No additional details provided.' }}
+              </div>
             </div>
           </div>
         </div>
@@ -340,6 +323,7 @@ onMounted(fetchRecord)
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 24px; }
 
 .info-group { display: flex; flex-direction: column; gap: 4px; }
+.info-group.full-width { grid-column: 1 / -1; margin-top: 4px; }
 .info-group label { font-size: 11px; font-weight: var(--weight-bold); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
 .info-val { font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--text-primary); }
 .info-val.mono { font-family: monospace; color: var(--orange-accent); font-weight: var(--weight-bold); }
