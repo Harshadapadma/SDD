@@ -144,7 +144,7 @@ class ForgotPasswordView(APIView):
 
 
 # -------------------------------
-# Login View (with MFA for Admin/Compliance Officer)
+# Login View (Direct Login - No MFA)
 # -------------------------------
 class LoginView(APIView):
     authentication_classes = []
@@ -170,27 +170,7 @@ class LoginView(APIView):
             # Clear failed login attempts on successful authentication
             FailedLoginAttempt.clear_failures(user.email)
 
-            # Check if MFA is required for ADMIN / COMPLIANCE_OFFICER
-            if user.role in ["ADMIN", "COMPLIANCE_OFFICER"]:
-                # Generate OTP and create MFA challenge
-                otp_code = MFAChallenge.generate_otp()
-                challenge = MFAChallenge.objects.create(
-                    user=user,
-                    otp_hash=MFAChallenge.hash_otp(otp_code),
-                )
-
-                # Send OTP via email
-                _send_mfa_otp_email(user, otp_code)
-
-                log_security_event('MFA_SENT', request, user, f'MFA OTP sent to {user.email}')
-
-                return Response({
-                    "mfa_required": True,
-                    "mfa_session": str(challenge.session_token),
-                    "message": "A verification code has been sent to your email."
-                })
-
-            # For COLLABORATOR / VIEWER: Direct login (no MFA)
+            # Direct login for all roles (refresh token in HttpOnly cookie)
             refresh = RefreshToken.for_user(user)
 
             log_security_event('LOGIN_SUCCESS', request, user, f'Direct login for {user.role}')
@@ -217,80 +197,6 @@ class LoginView(APIView):
             log_security_event('LOGIN_FAILED', request, details=f'Failed login for {email}', level='WARNING')
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-# -------------------------------
-# Verify MFA OTP View
-# -------------------------------
-class VerifyMFAView(APIView):
-    authentication_classes = []
-    permission_classes = [AllowAny]
-    throttle_classes = [LoginRateThrottle]
-
-    def post(self, request):
-        mfa_session = request.data.get('mfa_session', '').strip()
-        otp_code = request.data.get('otp_code', '').strip()
-
-        if not mfa_session or not otp_code:
-            return Response(
-                {"error": "MFA session and OTP code are required."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        try:
-            challenge = MFAChallenge.objects.get(session_token=mfa_session)
-        except MFAChallenge.DoesNotExist:
-            log_security_event('MFA_FAILED', request, details=f'Invalid MFA session: {mfa_session}', level='WARNING')
-            return Response(
-                {"error": "Invalid or expired verification session."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        user = challenge.user
-
-        # Check if expired
-        if challenge.is_expired:
-            log_security_event('MFA_EXPIRED', request, user, 'MFA OTP expired')
-            return Response(
-                {"error": "Verification code has expired. Please log in again."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Check if max attempts exceeded
-        if challenge.is_locked:
-            log_security_event('MFA_LOCKED', request, user, 'MFA max attempts exceeded')
-            return Response(
-                {"error": "Too many failed attempts. Please log in again."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Verify OTP
-        if challenge.verify(otp_code):
-            refresh = RefreshToken.for_user(user)
-
-            log_security_event('MFA_SUCCESS', request, user, 'MFA verification successful')
-            log_security_event('LOGIN_SUCCESS', request, user, f'MFA login for {user.role}')
-
-            response = Response({
-                "access": str(refresh.access_token),
-                "user": {
-                    "id": user.id,
-                    "public_id": user.public_id,
-                    "email": user.email,
-                    "name": user.name,
-                    "role": user.role,
-                }
-            })
-
-            _set_refresh_cookie(response, refresh)
-            return response
-        else:
-            remaining = MFAChallenge.MAX_ATTEMPTS - challenge.attempts
-            log_security_event('MFA_FAILED', request, user, f'Wrong OTP, {remaining} attempts remaining')
-            return Response(
-                {"error": f"Incorrect verification code. {remaining} attempts remaining."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
 
 
 # -------------------------------

@@ -4,13 +4,12 @@ from .views import (
     BlacklistUserView, ChangeRoleView, ProfileView, DashboardStatsView,
     VerifySetupTokenView, PingUserView, ChangePasswordView,
     ForgotPasswordView, UserStatsView,
-    CookieTokenRefreshView, LogoutView, VerifyMFAView,
+    CookieTokenRefreshView, LogoutView,
     ResendActivationView
 )
 
 urlpatterns = [
     path('login/', LoginView.as_view(), name='login'),
-    path('verify-mfa/', VerifyMFAView.as_view(), name='verify-mfa'),
     path('token/refresh/', CookieTokenRefreshView.as_view(), name='token-refresh'),
     path('logout/', LogoutView.as_view(), name='logout'),
     path('forgot-password/', ForgotPasswordView.as_view(), name='forgot-password'),

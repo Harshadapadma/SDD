@@ -16,13 +16,6 @@ const { notify } = useNotifications();
 const emailRegex = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/;
 const isEmailValid = computed(() => emailRegex.test(email.value));
 
-// ── MFA State ────────────────────────────────────────────────
-const mfaRequired = ref(false);
-const mfaSession = ref("");
-const otpCode = ref("");
-const mfaLoading = ref(false);
-const mfaError = ref("");
-
 // ── Forgot Password ──────────────────────────────────────────
 const forgotLoading = ref(false);
 const forgotFlash = ref<{ type: 'success' | 'error'; msg: string } | null>(null);
@@ -70,16 +63,6 @@ const handleLogin = async () => {
       password: password.value,
     });
 
-    // MFA required for ADMIN / COMPLIANCE_OFFICER
-    if (res.data.mfa_required) {
-      mfaRequired.value = true;
-      mfaSession.value = res.data.mfa_session;
-      mfaError.value = "";
-      otpCode.value = "";
-      return;
-    }
-
-    // Direct login for COLLABORATOR / VIEWER (refresh token is in HttpOnly cookie)
     localStorage.setItem("access", res.data.access);
     localStorage.setItem("user", JSON.stringify(res.data.user));
 
@@ -94,42 +77,6 @@ const handleLogin = async () => {
   } finally {
     loading.value = false;
   }
-};
-
-const handleVerifyMFA = async () => {
-  if (!otpCode.value || otpCode.value.length !== 6) {
-    mfaError.value = "Please enter the 6-digit verification code.";
-    return;
-  }
-
-  mfaLoading.value = true;
-  mfaError.value = "";
-
-  try {
-    const res = await api.post("auth/verify-mfa/", {
-      mfa_session: mfaSession.value,
-      otp_code: otpCode.value,
-    });
-
-    localStorage.setItem("access", res.data.access);
-    localStorage.setItem("user", JSON.stringify(res.data.user));
-
-    notify("Login Successful", "Welcome back to Negen SDD!", "SUCCESS");
-    router.push("/");
-  } catch (err: any) {
-    mfaError.value =
-      err?.response?.data?.error ||
-      "Verification failed. Please try again.";
-  } finally {
-    mfaLoading.value = false;
-  }
-};
-
-const cancelMFA = () => {
-  mfaRequired.value = false;
-  mfaSession.value = "";
-  otpCode.value = "";
-  mfaError.value = "";
 };
 </script>
 
@@ -155,60 +102,8 @@ const cancelMFA = () => {
           </h1>
         </div>
 
-        <!-- ─── MFA OTP VERIFICATION FORM ─────────────────────────── -->
-        <form v-if="mfaRequired" @submit.prevent="handleVerifyMFA" class="login-form">
-          <div class="mfa-header">
-            <div class="mfa-icon-wrap">
-              <i class="fas fa-shield-halved"></i>
-            </div>
-            <h2 class="mfa-title">Two-Factor Verification</h2>
-            <p class="mfa-subtitle">A 6-digit verification code has been sent to your email address. Enter it below to complete sign-in.</p>
-          </div>
-
-          <Transition name="slide-fade">
-            <div v-if="mfaError" class="error-banner">
-              <i class="fas fa-circle-exclamation"></i>
-              <span>{{ mfaError }}</span>
-            </div>
-          </Transition>
-
-          <div class="form-group">
-            <label for="otp">Verification Code</label>
-            <div class="input-wrap">
-              <i class="fas fa-key input-icon"></i>
-              <input
-                id="otp"
-                v-model="otpCode"
-                type="text"
-                inputmode="numeric"
-                placeholder="000000"
-                maxlength="6"
-                autocomplete="one-time-code"
-                class="otp-input"
-              />
-              <div class="input-glow"></div>
-            </div>
-          </div>
-
-          <button type="submit" class="submit-pill-btn" :disabled="mfaLoading || otpCode.length !== 6">
-            <div class="btn-shimmer"></div>
-            <span v-if="!mfaLoading" class="btn-text">
-              <span>Verify & Sign In</span>
-              <i class="fas fa-check"></i>
-            </span>
-            <span v-else class="btn-text">
-              <span class="loader"></span>
-              <span>Verifying…</span>
-            </span>
-          </button>
-
-          <button type="button" class="back-to-login-btn" @click="cancelMFA">
-            <i class="fas fa-arrow-left"></i> Back to Login
-          </button>
-        </form>
-
         <!-- ─── STANDARD LOGIN FORM ───────────────────────────────── -->
-        <form v-else @submit.prevent="handleLogin" class="login-form">
+        <form @submit.prevent="handleLogin" class="login-form">
           <!-- Error Banner -->
           <Transition name="slide-fade">
             <div v-if="errorMessage" class="error-banner">
