@@ -15,6 +15,18 @@ services:
         value: ".onrender.com,localhost,127.0.0.1"
       - key: CORS_ALLOW_ALL_ORIGINS
         value: "True"
+      - key: ADMIN_NAME
+        value: "Administrator"
+      - key: ADMIN_EMAIL
+        value: "admin@negensdd.com"
+      - key: ADMIN_PASSWORD
+        value: "37mG%abJzYrB!WA4"
+      - key: COMPLIANCE_NAME
+        value: "Compliance Manager"
+      - key: COMPLIANCE_EMAIL
+        value: "compliance@negensdd.com"
+      - key: COMPLIANCE_PASSWORD
+        value: "&u1krM3VSrhm^O*M"
 
   # Frontend Vue App (Static Site)
   - type: web

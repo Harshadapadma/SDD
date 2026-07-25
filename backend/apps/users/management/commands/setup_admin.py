@@ -7,13 +7,9 @@ class Command(BaseCommand):
     help = 'Create a superuser from environment variables if it does not exist'
 
     def handle(self, *args, **options):
-        admin_email = os.getenv('ADMIN_EMAIL')
-        admin_password = os.getenv('ADMIN_PASSWORD')
-        admin_name = os.getenv('ADMIN_NAME', 'Admin')
-
-        if not admin_email or not admin_password:
-            self.stdout.write(self.style.WARNING('ADMIN_EMAIL or ADMIN_PASSWORD not set in .env. Skipping admin setup.'))
-            return
+        admin_email = os.getenv('ADMIN_EMAIL', 'admin@negensdd.com')
+        admin_password = os.getenv('ADMIN_PASSWORD', '37mG%abJzYrB!WA4')
+        admin_name = os.getenv('ADMIN_NAME', 'Administrator')
 
         user = User.objects.filter(email=admin_email).first()
         if not user:
@@ -35,9 +31,9 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(f'Successfully updated admin account: {admin_email}'))
 
         # Seed Compliance Officer
-        comp_email = os.getenv('COMPLIANCE_EMAIL')
-        comp_password = os.getenv('COMPLIANCE_PASSWORD')
-        comp_name = os.getenv('COMPLIANCE_NAME', 'Compliance Officer')
+        comp_email = os.getenv('COMPLIANCE_EMAIL', 'compliance@negensdd.com')
+        comp_password = os.getenv('COMPLIANCE_PASSWORD', '&u1krM3VSrhm^O*M')
+        comp_name = os.getenv('COMPLIANCE_NAME', 'Compliance Manager')
 
         if comp_email and comp_password:
             comp_user = User.objects.filter(email=comp_email).first()
