@@ -2,22 +2,46 @@ from rest_framework import serializers
 from .models import DeleteRequest, RoleChangeRequest, AccessRequest, CreationRequest, EditRequest, ClarificationMessage
 # ... [existing serializers here] ...
 class DeleteRequestSerializer(serializers.ModelSerializer):
-    record_id = serializers.CharField(source="record.public_id", read_only=True)
-    requested_by = serializers.CharField(source="requested_by.public_id", read_only=True)
+    record_id = serializers.SerializerMethodField()
+    record_name = serializers.SerializerMethodField()
+    user_id = serializers.CharField(source="requested_by.public_id", read_only=True)
+    user_name = serializers.CharField(source="requested_by.name", read_only=True)
+    user_role = serializers.CharField(source="requested_by.role", read_only=True)
+    requested_by = serializers.CharField(source="requested_by.name", read_only=True)
 
     class Meta:
         model = DeleteRequest
         fields = [
             "id",
             "record_id",
+            "record_name",
+            "user_id",
+            "user_name",
+            "user_role",
             "requested_by",
             "status",
             "created_at"
         ]
 
+    def get_record_id(self, obj):
+        if obj.record_public_id:
+            return obj.record_public_id
+        if obj.record:
+            return obj.record.public_id
+        return "Deleted Record"
+
+    def get_record_name(self, obj):
+        if obj.record_name:
+            return obj.record_name
+        if obj.record:
+            return obj.record.name
+        return "Deleted Record"
+
 class RoleChangeRequestSerializer(serializers.ModelSerializer):
     user_id = serializers.CharField(source="user.public_id", read_only=True)
     user_name = serializers.CharField(source="user.name", read_only=True)
+    user_role = serializers.CharField(source="user.role", read_only=True)
+    requested_by = serializers.CharField(source="user.name", read_only=True)
 
     class Meta:
         model = RoleChangeRequest
@@ -25,6 +49,8 @@ class RoleChangeRequestSerializer(serializers.ModelSerializer):
             "id",
             "user_id",
             "user_name",
+            "user_role",
+            "requested_by",
             "requested_role",
             "status",
             "created_at"
@@ -32,18 +58,22 @@ class RoleChangeRequestSerializer(serializers.ModelSerializer):
 
 class AccessRequestSerializer(serializers.ModelSerializer):
     record_id = serializers.CharField(source="record.public_id", read_only=True)
+    record_name = serializers.CharField(source="record.name", read_only=True)
     user_id = serializers.CharField(source="user.public_id", read_only=True)
     user_name = serializers.CharField(source="user.name", read_only=True)
     user_role = serializers.CharField(source="user.role", read_only=True)
+    requested_by = serializers.CharField(source="user.name", read_only=True)
 
     class Meta:
         model = AccessRequest
         fields = [
             "id",
             "record_id",
+            "record_name",
             "user_id",
             "user_name",
             "user_role",
+            "requested_by",
             "requested_access",
             "status",
             "created_at"
@@ -53,6 +83,9 @@ class AccessRequestSerializer(serializers.ModelSerializer):
 class CreationRequestSerializer(serializers.ModelSerializer):
     record_id = serializers.SerializerMethodField()
     record_name = serializers.SerializerMethodField()
+    user_id = serializers.CharField(source="requested_by.public_id", read_only=True)
+    user_name = serializers.CharField(source="requested_by.name", read_only=True)
+    user_role = serializers.CharField(source="requested_by.role", read_only=True)
     requested_by = serializers.CharField(source="requested_by.name", read_only=True)
     current_data = serializers.SerializerMethodField()
     has_unread = serializers.SerializerMethodField()
@@ -63,6 +96,9 @@ class CreationRequestSerializer(serializers.ModelSerializer):
             "id",
             "record_id",
             "record_name",
+            "user_id",
+            "user_name",
+            "user_role",
             "requested_by",
             "status",
             "current_data",
@@ -102,7 +138,11 @@ class CreationRequestSerializer(serializers.ModelSerializer):
 
 
 class EditRequestSerializer(serializers.ModelSerializer):
-    record_id = serializers.CharField(source="record.public_id", read_only=True)
+    record_id = serializers.SerializerMethodField()
+    record_name = serializers.SerializerMethodField()
+    user_id = serializers.CharField(source="requested_by.public_id", read_only=True)
+    user_name = serializers.CharField(source="requested_by.name", read_only=True)
+    user_role = serializers.CharField(source="requested_by.role", read_only=True)
     requested_by = serializers.CharField(source="requested_by.name", read_only=True)
     current_data = serializers.SerializerMethodField()
 
@@ -111,12 +151,30 @@ class EditRequestSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "record_id",
+            "record_name",
+            "user_id",
+            "user_name",
+            "user_role",
             "requested_by",
             "status",
             "proposed_data",
             "current_data",
             "created_at"
         ]
+
+    def get_record_id(self, obj):
+        if obj.record_public_id:
+            return obj.record_public_id
+        if obj.record:
+            return obj.record.public_id
+        return "Deleted Record"
+
+    def get_record_name(self, obj):
+        if obj.record_name:
+            return obj.record_name
+        if obj.record:
+            return obj.record.name
+        return "Deleted Record"
 
     def get_current_data(self, obj):
         if obj.record:

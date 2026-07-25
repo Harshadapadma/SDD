@@ -18,19 +18,20 @@ class SecurityHeadersMiddleware:
 
         # Build CSP directives based on environment
         frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
-        api_origins = 'http://127.0.0.1:8000 http://localhost:8000'
+        cors_allowed = " ".join(getattr(settings, 'CORS_ALLOWED_ORIGINS', []))
 
         if not settings.DEBUG:
-            # In production, restrict connect-src to the actual API domain
-            api_origins = "'self'"
+            api_origins = f"'self' https: {frontend_url} {cors_allowed}".strip()
+        else:
+            api_origins = f"'self' http://127.0.0.1:8000 http://localhost:8000 http://localhost:5173 http://127.0.0.1:5173 {frontend_url} {cors_allowed}".strip()
 
         self.csp = "; ".join([
             "default-src 'self'",
-            "script-src 'self'",
+            "script-src 'self' 'unsafe-inline'",
             "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com",
             "img-src 'self' data: blob:",
             "font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com",
-            f"connect-src 'self' {api_origins}",
+            f"connect-src {api_origins}",
             "object-src 'none'",
             "frame-ancestors 'none'",
             "base-uri 'self'",

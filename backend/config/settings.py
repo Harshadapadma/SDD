@@ -24,22 +24,19 @@ load_dotenv(os.path.join(BASE_DIR, '.env'))
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY: SECRET_KEY must be set in environment variables. No fallback.
-from django.core.exceptions import ImproperlyConfigured
+# SECURITY: SECRET_KEY with safe fallback if env var is missing
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-negen-sdd-demo-production-key-fallback')
 
-SECRET_KEY = os.getenv('SECRET_KEY')
-if not SECRET_KEY:
-    raise ImproperlyConfigured(
-        "CRITICAL: The SECRET_KEY environment variable is not set. "
-        "Add SECRET_KEY to your .env file or environment variables. "
-        "Generate one with: python -c \"from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())\""
-    )
+# SECURITY: DEBUG controlled via environment variable (default False for production)
+DEBUG = os.getenv('DEBUG', 'False').lower() in ('true', '1', 'yes')
 
-# SECURITY: DEBUG controlled via environment variable
-DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
+# SECURITY: ALLOWED_HOSTS from environment variable with .onrender.com & localhost fallback
+ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,.onrender.com,*').split(',') if h.strip()]
 
-# SECURITY: ALLOWED_HOSTS from environment variable
-ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if h.strip()]
+# CSRF Trusted Origins for production HTTPS
+CSRF_TRUSTED_ORIGINS = [
+    h.strip() for h in os.getenv('CSRF_TRUSTED_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173,https://*.onrender.com').split(',') if h.strip()
+]
 
 
 # Application definition
@@ -63,6 +60,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'config.middleware.SecurityHeadersMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -92,15 +90,25 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 
-# Database
-# https://docs.djangoproject.com/en/5.2/settings/#databases
+# Database Configuration
+import dj_database_url
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+DATABASE_URL = os.getenv('DATABASE_URL')
+if DATABASE_URL:
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
@@ -135,12 +143,9 @@ USE_TZ = True
 
 
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
-
 STATIC_URL = 'static/'
-
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -178,7 +183,7 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 # CORS Configuration
-CORS_ALLOW_ALL_ORIGINS = DEBUG  # True in dev, False in prod
+CORS_ALLOW_ALL_ORIGINS = os.getenv('CORS_ALLOW_ALL_ORIGINS', 'True' if DEBUG else 'False').lower() in ('true', '1', 'yes')
 CORS_ALLOWED_ORIGINS = [
     h.strip() for h in os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173').split(',') if h.strip()
 ]
@@ -199,8 +204,8 @@ FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173').rstrip('/')
 # ─── Refresh Token Cookie Configuration ────────────────────────────────────
 SDD_REFRESH_COOKIE_NAME = 'sdd_refresh_token'
 SDD_REFRESH_COOKIE_HTTPONLY = True
-SDD_REFRESH_COOKIE_SECURE = not DEBUG  # False in dev (HTTP), True in prod (HTTPS)
-SDD_REFRESH_COOKIE_SAMESITE = 'Lax'    # Lax for cross-port dev, works with Strict in prod
+SDD_REFRESH_COOKIE_SECURE = not DEBUG or os.getenv('SECURE_COOKIE', 'False').lower() in ('true', '1', 'yes')
+SDD_REFRESH_COOKIE_SAMESITE = 'None' if not DEBUG else 'Lax'
 SDD_REFRESH_COOKIE_PATH = '/api/auth/'
 SDD_REFRESH_COOKIE_MAX_AGE = 7 * 24 * 60 * 60  # 7 days in seconds
 

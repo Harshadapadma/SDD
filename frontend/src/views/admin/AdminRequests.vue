@@ -64,62 +64,163 @@
             <div
               v-for="(req, i) in activeList"
               :key="req.type + req.id"
-              class="list-row"
+              :class="['list-row-wrapper', { 'is-expanded': expandedReqId === getReqKey(req) }]"
               :style="{ animationDelay: i * 50 + 'ms' }"
             >
-              <!-- Type Icon -->
-              <div class="row-icon" :class="req.type.toLowerCase()">
-                <i :class="typeIcon(req.type)"></i>
-              </div>
-
-              <!-- Main Info -->
-              <div class="row-info">
-                <div class="row-label">
-                  <template v-if="req.type === 'ROLE'">
-                    {{ req.user_name || req.requested_by || 'User' }} requested to change their role to {{ req.requested_role ? req.requested_role.toLowerCase() : 'viewer' }}
-                  </template>
-                  <template v-else>
-                    {{ 'Record ' + req.record_id }}
-                  </template>
+              <!-- Collapsed Row Header -->
+              <div class="list-row-header" @click="toggleExpand(req)">
+                <!-- Type Icon -->
+                <div class="row-icon" :class="req.type.toLowerCase()">
+                  <i :class="typeIcon(req.type)"></i>
                 </div>
-                <div class="row-sub">
-                  <template v-if="req.type === 'ROLE'">
-                    <i class="fas fa-id-badge"></i>
-                    Permission Modification Request
+
+                <!-- Main Info -->
+                <div class="row-info">
+                  <div class="row-label">
+                    <template v-if="req.type === 'ROLE'">
+                      <strong>{{ req.user_name || req.requested_by || 'User' }}</strong> requested to change role to <strong>{{ req.requested_role ? req.requested_role.toLowerCase() : 'viewer' }}</strong>
+                    </template>
+                    <template v-else>
+                      <strong>{{ 'Record ' + (req.record_id || req.id) }}</strong>
+                      <span v-if="req.record_name" class="row-record-name"> — {{ req.record_name }}</span>
+                    </template>
+                  </div>
+                  <div class="row-sub">
+                    <span class="user-pill"><i class="fas fa-user-circle"></i> {{ req.user_name || req.requested_by || 'User' }}</span>
+                    <span class="uid-pill" v-if="req.user_id"><i class="fas fa-id-card"></i> {{ req.user_id }}</span>
                     &nbsp;·&nbsp;
                     <i class="fas fa-clock"></i>
                     {{ formatDate(req.created_at) }}
-                  </template>
-                  <template v-else>
-                    <i class="fas fa-user-circle"></i>
-                    {{ (req.type === 'DELETE' || req.type === 'ACCESS' || req.type === 'CREATION' || req.type === 'EDIT') ? (req.requested_by || req.user_name) : req.user_name }}
-                    &nbsp;·&nbsp;
-                    <i class="fas fa-clock"></i>
-                    {{ formatDate(req.created_at) }}
-                  </template>
+                  </div>
+                </div>
+
+                <!-- Type Chip -->
+                <span :class="['type-chip', req.type.toLowerCase()]">
+                  {{ req.type === 'DELETE' ? 'Deletion' : req.type === 'ACCESS' ? 'Access' : req.type === 'ROLE' ? 'Role' : req.type === 'CREATION' ? 'Creation' : 'Edition' }}
+                </span>
+
+                <!-- ID badge -->
+                <span class="row-id">#{{ req.id }}</span>
+
+                <!-- Chevron Icon -->
+                <button class="expand-chevron-btn" aria-label="Expand request details">
+                  <i :class="['fas', expandedReqId === getReqKey(req) ? 'fa-chevron-up' : 'fa-chevron-down']"></i>
+                </button>
+
+                <!-- Actions (pending only) -->
+                <div class="row-actions" v-if="activeTab === 'pending'">
+                  <button class="action-pill approve" @click.stop="review(req, 'APPROVE')" :disabled="reviewing === req.type + req.id">
+                    <i class="fas fa-check"></i> Approve
+                  </button>
+                  <button class="action-pill reject" @click.stop="review(req, 'REJECT')" :disabled="reviewing === req.type + req.id">
+                    <i class="fas fa-times"></i> Reject
+                  </button>
+                  <button v-if="req.type === 'CREATION'" class="action-pill chat" @click.stop="review(req, 'REVIEW')">
+                    <i class="fas fa-comments"></i> Review
+                  </button>
                 </div>
               </div>
 
-              <!-- Type Chip -->
-              <span :class="['type-chip', req.type.toLowerCase()]">
-                {{ req.type === 'DELETE' ? 'Deletion' : req.type === 'ACCESS' ? 'Access' : req.type === 'ROLE' ? 'Role' : req.type === 'CREATION' ? 'Creation' : 'Edition' }}
-              </span>
+              <!-- Expanded Drawer (Clean & Minimalist) -->
+              <transition name="expand">
+                <div class="expanded-drawer" v-if="expandedReqId === getReqKey(req)">
+                  
+                  <!-- Clean Summary Bar -->
+                  <div class="clean-summary-bar">
+                    <div class="summary-statement">
+                      <i :class="['fas', req.type === 'DELETE' ? 'fa-trash-alt' : req.type === 'ACCESS' ? 'fa-key' : req.type === 'ROLE' ? 'fa-user-shield' : req.type === 'CREATION' ? 'fa-plus-circle' : 'fa-pen-to-square']"></i>
+                      <span>{{ getRequestStatement(req).text }}</span>
+                    </div>
 
-              <!-- ID badge -->
-              <span class="row-id">#{{ req.id }}</span>
+                    <!-- Quick Specs Pills Row -->
+                    <div class="specs-pills-row">
+                      <span class="spec-pill">
+                        <i class="fas fa-user-circle"></i> {{ req.user_name || req.requested_by || '—' }}
+                      </span>
+                      <span class="spec-pill mono" v-if="req.user_id">
+                        <i class="fas fa-id-card"></i> {{ req.user_id }}
+                      </span>
+                      <span :class="['spec-pill role', (req.user_role || 'COLLABORATOR').toLowerCase()]">
+                        Current: {{ req.user_role || 'COLLABORATOR' }}
+                      </span>
+                      <span class="spec-pill mono" v-if="req.type !== 'ROLE' && req.record_id">
+                        <i class="fas fa-file-lines"></i> {{ req.record_id }}
+                      </span>
+                    </div>
+                  </div>
 
-              <!-- Actions (pending only) (Skeuomorphism) -->
-              <div class="row-actions" v-if="activeTab === 'pending'">
-                <button class="action-pill approve" @click="review(req, 'APPROVE')" :disabled="reviewing === req.type + req.id">
-                  <i class="fas fa-check"></i> Approve
-                </button>
-                <button class="action-pill reject" @click="review(req, 'REJECT')" :disabled="reviewing === req.type + req.id">
-                  <i class="fas fa-times"></i> Reject
-                </button>
-                <button v-if="req.type === 'CREATION'" class="action-pill chat" @click="review(req, 'REVIEW')">
-                  <i class="fas fa-comments"></i> Review
-                </button>
-              </div>
+                  <!-- Payloads -->
+
+                  <!-- CREATION DETAILS -->
+                  <div v-if="req.type === 'CREATION'" class="expanded-section">
+                    <div class="section-header-flex">
+                      <h4 class="section-heading"><i class="fas fa-file-invoice"></i> Proposed Record Creation Details</h4>
+                      <button class="action-pill chat sm" @click.stop="review(req, 'REVIEW')">
+                        <i class="fas fa-comments"></i> Clarification History
+                      </button>
+                    </div>
+                    <div class="details-grid-container">
+                      <div 
+                        v-for="(val, key) in getCreationDetails(req)" 
+                        :key="key" 
+                        :class="['details-item-card', isLongValue(val) ? 'full-width' : '']"
+                      >
+                        <div class="item-label">{{ formatFieldName(key) }}</div>
+                        <div class="item-value">
+                          <span v-if="isMonospaceField(key)" class="monospace-badge">{{ val || '—' }}</span>
+                          <div v-else-if="isLongValue(val)" class="long-value-box">{{ val || '—' }}</div>
+                          <span v-else-if="val === null || val === undefined || val === ''" class="empty-val">—</span>
+                          <span v-else class="val-text">{{ val }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- EDIT DETAILS -->
+                  <div v-else-if="req.type === 'EDIT'" class="expanded-section">
+                    <h4 class="section-heading"><i class="fas fa-right-left"></i> Proposed Changes</h4>
+                    <div class="diff-table-container">
+                      <table class="diff-table">
+                        <thead>
+                          <tr>
+                            <th>Field</th>
+                            <th>Current Value</th>
+                            <th>Proposed New Value</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-for="(val, key) in getProposedChanges(req)" :key="key">
+                            <td class="field-name">{{ formatFieldName(key) }}</td>
+                            <td class="old-val">
+                              <span class="diff-badge old">{{ req.current_data?.[key] || '—' }}</span>
+                            </td>
+                            <td class="new-val">
+                              <span class="diff-badge new">{{ val || '—' }}</span>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <!-- ACCESS WARNING (Viewer) -->
+                  <div v-else-if="req.type === 'ACCESS' && req.user_role === 'VIEWER'" class="expanded-section">
+                    <div class="viewer-warning-banner">
+                      <i class="fas fa-exclamation-triangle"></i>
+                      <span><strong>Role Restriction:</strong> Viewers cannot be assigned EDIT access until promoted to Collaborator.</span>
+                    </div>
+                  </div>
+
+                  <!-- DELETE WARNING -->
+                  <div v-else-if="req.type === 'DELETE'" class="expanded-section">
+                    <div class="danger-banner">
+                      <i class="fas fa-triangle-exclamation"></i>
+                      <span>Permanently erases Record <strong>{{ req.record_id }}</strong> and all associated access permissions.</span>
+                    </div>
+                  </div>
+
+                </div>
+              </transition>
             </div>
           </div>
 
@@ -293,6 +394,64 @@ const requests  = ref<any[]>([])
 const loading   = ref(false)
 const reviewing = ref<string | null>(null)
 const activeTab = ref<'pending' | 'approved' | 'rejected'>('pending')
+const expandedReqId = ref<string | null>(null)
+
+function getReqKey(req: any): string {
+  return `${req.type || req._type}-${req.id}`
+}
+
+function toggleExpand(req: any) {
+  const key = getReqKey(req)
+  expandedReqId.value = expandedReqId.value === key ? null : key
+  if (req.type === 'CREATION' && expandedReqId.value === key) {
+    fetchMessages(req.id)
+  }
+}
+
+function getRequestStatement(req: any) {
+  const userName = req.user_name || req.requested_by || 'User'
+  const userId = req.user_id ? `(${req.user_id})` : ''
+  const userRole = req.user_role || 'VIEWER'
+  const recordId = req.record_id ? `Record ${req.record_id}` : 'a record'
+  const recordName = req.record_name ? ` (${req.record_name})` : ''
+
+  if (req.type === 'ROLE') {
+    const targetRole = req.requested_role || 'COLLABORATOR'
+    return {
+      text: `${userName} ${userId} is requesting a system role change from ${userRole} to ${targetRole}.`,
+      typeLabel: 'Role Modification'
+    }
+  }
+  if (req.type === 'ACCESS') {
+    const access = req.requested_access || 'EDIT'
+    return {
+      text: `${userName} ${userId} (${userRole}) is requesting ${access} access for ${recordId}${recordName}.`,
+      typeLabel: 'Access Upgrade'
+    }
+  }
+  if (req.type === 'CREATION') {
+    return {
+      text: `${userName} ${userId} (${userRole}) requested approval to create ${recordId}${recordName}.`,
+      typeLabel: 'Record Creation'
+    }
+  }
+  if (req.type === 'EDIT') {
+    return {
+      text: `${userName} ${userId} (${userRole}) proposed modifications for ${recordId}${recordName}.`,
+      typeLabel: 'Record Modification'
+    }
+  }
+  if (req.type === 'DELETE') {
+    return {
+      text: `${userName} ${userId} (${userRole}) requested permanent deletion of ${recordId}${recordName}.`,
+      typeLabel: 'Record Deletion'
+    }
+  }
+  return {
+    text: `${userName} ${userId} submitted a request.`,
+    typeLabel: 'Workflow Request'
+  }
+}
 
 const pendingRequests  = computed(() => requests.value.filter(r => r.status === 'PENDING'))
 const approvedRequests = computed(() => requests.value.filter(r => r.status === 'APPROVED'))
@@ -964,6 +1123,199 @@ onMounted(fetchRequests)
   border: 1px solid rgba(34, 197, 94, 0.3);
   font-weight: 700;
   box-shadow: 0 1px 4px rgba(34, 197, 94, 0.15);
+}
+
+/* Expandable Rows */
+.list-row-wrapper {
+  border-bottom: 1px solid var(--card-divider);
+  transition: background var(--duration-fast), border-color var(--duration-fast);
+}
+.list-row-wrapper:last-child {
+  border-bottom: none;
+}
+.list-row-wrapper.is-expanded {
+  background: rgba(234, 108, 0, 0.03);
+}
+
+.list-row-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px;
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--duration-fast);
+}
+.list-row-header:hover {
+  background: rgba(234, 108, 0, 0.06);
+}
+
+.row-record-name {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  font-weight: normal;
+}
+
+.user-pill, .uid-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+}
+
+.expand-chevron-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-md);
+  transition: all var(--duration-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.list-row-header:hover .expand-chevron-btn {
+  color: var(--orange-accent);
+}
+
+/* Expanded Drawer */
+.expanded-drawer {
+  padding: 0 20px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border-top: 1px dashed rgba(234, 108, 0, 0.2);
+  margin-top: 4px;
+  animation: slideDown 0.25s ease-out forwards;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Clean Summary Bar */
+.clean-summary-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 18px;
+  border-radius: var(--radius-xl);
+  background: var(--bg-card);
+  border: 1px solid rgba(166, 169, 173, 0.25);
+  box-shadow: var(--neu-inset);
+  margin-top: 10px;
+}
+
+.summary-statement {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.summary-statement i {
+  color: var(--orange-accent);
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.specs-pills-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.spec-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: var(--weight-bold);
+  background: var(--bg-base);
+  color: var(--text-secondary);
+  border: 1px solid rgba(166, 169, 173, 0.25);
+}
+
+.spec-pill i {
+  color: var(--orange-accent);
+  font-size: 11px;
+}
+
+.spec-pill.mono {
+  font-family: 'Courier New', Consolas, monospace;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.spec-pill.role {
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.4px;
+}
+.spec-pill.role.collaborator { background: var(--orange-bg-subtle); color: var(--orange-accent); border-color: var(--orange-border); }
+.spec-pill.role.viewer { background: var(--info-bg); color: var(--info-700); border-color: var(--info-border); }
+
+.section-header-flex {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.action-pill.sm {
+  padding: 4px 10px;
+  font-size: 11px;
+}
+
+/* Banners */
+.info-banner, .danger-banner, .viewer-warning-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-lg);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  margin-top: 10px;
+}
+.info-banner {
+  background: var(--info-bg);
+  border: 1px solid var(--info-border);
+  color: var(--info-700);
+}
+.danger-banner {
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
+  color: var(--error-700);
+}
+.viewer-warning-banner {
+  background: #fefce8;
+  border: 1px solid #fde047;
+  color: #854d0e;
+}
+
+/* Section Heading */
+.section-heading {
+  font-size: var(--text-xs);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
+  margin-top: 12px;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 @media (max-width: 800px) { .split-view { grid-template-columns: 1fr; } }

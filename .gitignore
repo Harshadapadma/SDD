@@ -50,3 +50,6 @@ dist-ssr/
 .idea/
 .DS_Store
 Thumbs.db
+backend/staticfiles/
+staticfiles/
+text_crop.png

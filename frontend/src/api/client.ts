@@ -1,8 +1,11 @@
 import axios from "axios";
 import { useInactivityLock } from "../composables/useInactivityLock";
 
+const rawBaseURL = (import.meta as any).env?.VITE_API_BASE_URL || "http://127.0.0.1:8000/api/";
+const normalizedBaseURL = rawBaseURL.endsWith("/") ? rawBaseURL : `${rawBaseURL}/`;
+
 const api = axios.create({
-  baseURL: "http://127.0.0.1:8000/api/",
+  baseURL: normalizedBaseURL,
   withCredentials: true, // Required: sends HttpOnly refresh cookie automatically
 });
 
@@ -60,7 +63,7 @@ api.interceptors.response.use(
 
       try {
         // Refresh token is sent automatically via HttpOnly cookie (withCredentials)
-        const refreshUrl = `${api.defaults.baseURL || "http://127.0.0.1:8000/api/"}auth/token/refresh/`;
+        const refreshUrl = `${normalizedBaseURL}auth/token/refresh/`;
         const res = await axios.post(refreshUrl, {}, { withCredentials: true });
 
         const newAccess = res.data.access;
