@@ -1,17 +1,19 @@
 import os
 from django.core.management.base import BaseCommand
 from apps.users.models import User, UserRole
-from django.conf import settings
+from apps.users.security_models import FailedLoginAttempt
 
 class Command(BaseCommand):
     help = 'Create a superuser from environment variables if it does not exist'
 
     def handle(self, *args, **options):
-        admin_email = os.getenv('ADMIN_EMAIL', 'admin@negensdd.com')
+        admin_email = os.getenv('ADMIN_EMAIL', 'admin@negensdd.com').strip().lower()
         admin_password = os.getenv('ADMIN_PASSWORD', '37mG%abJzYrB!WA4')
         admin_name = os.getenv('ADMIN_NAME', 'Administrator')
 
-        user = User.objects.filter(email=admin_email).first()
+        FailedLoginAttempt.clear_failures(admin_email)
+
+        user = User.objects.filter(email__iexact=admin_email).first()
         if not user:
             self.stdout.write(f'Creating superuser: {admin_email}...')
             User.objects.create_superuser(
@@ -25,18 +27,21 @@ class Command(BaseCommand):
             user.name = admin_name
             user.set_password(admin_password)
             user.role = UserRole.ADMIN
+            user.is_active = True
             user.is_staff = True
             user.is_superuser = True
             user.save()
             self.stdout.write(self.style.SUCCESS(f'Successfully updated admin account: {admin_email}'))
 
         # Seed Compliance Officer
-        comp_email = os.getenv('COMPLIANCE_EMAIL', 'compliance@negensdd.com')
+        comp_email = os.getenv('COMPLIANCE_EMAIL', 'compliance@negensdd.com').strip().lower()
         comp_password = os.getenv('COMPLIANCE_PASSWORD', '&u1krM3VSrhm^O*M')
         comp_name = os.getenv('COMPLIANCE_NAME', 'Compliance Manager')
 
+        FailedLoginAttempt.clear_failures(comp_email)
+
         if comp_email and comp_password:
-            comp_user = User.objects.filter(email=comp_email).first()
+            comp_user = User.objects.filter(email__iexact=comp_email).first()
             if not comp_user:
                 self.stdout.write(f'Creating compliance officer: {comp_email}...')
                 User.objects.create_user(

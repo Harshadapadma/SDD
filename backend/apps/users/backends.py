@@ -8,8 +8,12 @@ class EmailBackend(BaseBackend):
     """
 
     def authenticate(self, request, email=None, password=None, **kwargs):
+        if not email or not password:
+            return None
+
+        clean_email = str(email).strip().lower()
         try:
-            user = User.objects.get(email=email)
+            user = User.objects.get(email__iexact=clean_email)
         except User.DoesNotExist:
             return None
 
