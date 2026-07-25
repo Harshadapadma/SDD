@@ -20,19 +20,10 @@ services:
   - type: web
     name: negen-sdd-frontend
     env: static
-    region: singapore
-    plan: free
     rootDir: frontend
     buildCommand: "npm install && npm run build"
-    publishDir: "dist"
+    staticPublishPath: "dist"
     routes:
       - type: rewrite
         source: "/*"
         destination: "/index.html"
-    envVars:
-      - key: VITE_API_BASE_URL
-        fromService:
-          type: web
-          name: negen-sdd-backend
-          property: url
-          append: "/api/"
