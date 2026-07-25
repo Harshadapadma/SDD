@@ -8,17 +8,16 @@ class UsersConfig(AppConfig):
 
     def ready(self):
         """
-        Runs whenever the application starts.
-        Automatically checks and creates the default admin from .env
+        Runs whenever the application starts (Gunicorn WSGI or runserver).
+        Automatically checks and creates/updates default admin & compliance officer.
         """
         import sys
-        # Only attempt auto-setup when running the actual server
-        if 'runserver' in sys.argv:
-            from django.core.management import call_command
-            try:
-                # This ensures an admin exists without manual command entry
-                call_command('setup_admin')
-            except Exception:
-                # If migrations haven't run yet, this will fail silently
-                # preventing the server from crashing before it's ready.
-                pass
+        skip_commands = {'migrate', 'makemigrations', 'collectstatic', 'test', 'check'}
+        if any(cmd in sys.argv for cmd in skip_commands):
+            return
+
+        from django.core.management import call_command
+        try:
+            call_command('setup_admin')
+        except Exception:
+            pass
