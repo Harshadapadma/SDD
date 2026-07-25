@@ -10,3 +10,6 @@ python manage.py collectstatic --no-input
 
 echo "Running database migrations..."
 python manage.py migrate
+
+echo "Seeding/Updating Admin & Compliance Officer accounts..."
+python manage.py setup_admin
