@@ -1,0 +1,19 @@
+{
+  "functions": [
+    {
+      "source": "backend",
+      "codebase": "default",
+      "ignore": [
+        "venv",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.pyc",
+        "__pycache__",
+        "db.sqlite3",
+        "security.log"
+      ],
+      "runtime": "python311"
+    }
+  ]
+}

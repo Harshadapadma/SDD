@@ -30,12 +30,14 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-negen-sdd-demo-production-
 # SECURITY: DEBUG controlled via environment variable (default False for production)
 DEBUG = os.getenv('DEBUG', 'False').lower() in ('true', '1', 'yes')
 
-# SECURITY: ALLOWED_HOSTS from environment variable with .onrender.com & localhost fallback
-ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,.onrender.com,*').split(',') if h.strip()]
+# SECURITY: ALLOWED_HOSTS from environment variable with cloud function & localhost fallbacks
+ALLOWED_HOSTS = [
+    h.strip() for h in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,.onrender.com,.cloudfunctions.net,.run.app,*').split(',') if h.strip()
+]
 
 # CSRF Trusted Origins for production HTTPS
 CSRF_TRUSTED_ORIGINS = [
-    h.strip() for h in os.getenv('CSRF_TRUSTED_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173,https://*.onrender.com').split(',') if h.strip()
+    h.strip() for h in os.getenv('CSRF_TRUSTED_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173,https://*.onrender.com,https://*.cloudfunctions.net,https://*.run.app').split(',') if h.strip()
 ]
 
 
@@ -182,11 +184,16 @@ AUTHENTICATION_BACKENDS = [
     'apps.users.backends.EmailBackend',
 ]
 
+# Frontend URL Configuration
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173').rstrip('/')
+
 # CORS Configuration
 CORS_ALLOW_ALL_ORIGINS = os.getenv('CORS_ALLOW_ALL_ORIGINS', 'True' if DEBUG else 'False').lower() in ('true', '1', 'yes')
 CORS_ALLOWED_ORIGINS = [
     h.strip() for h in os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173').split(',') if h.strip()
 ]
+if FRONTEND_URL and FRONTEND_URL not in CORS_ALLOWED_ORIGINS:
+    CORS_ALLOWED_ORIGINS.append(FRONTEND_URL)
 CORS_ALLOW_CREDENTIALS = True  # Required for HttpOnly cookie refresh tokens
 
 # Email Configuration
@@ -197,9 +204,6 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = f"Negen SDD Admin <{os.getenv('EMAIL_HOST_USER', 'ayushr12.01@gmail.com')}>"
-
-# Frontend URL Configuration
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173').rstrip('/')
 
 # ─── Refresh Token Cookie Configuration ────────────────────────────────────
 SDD_REFRESH_COOKIE_NAME = 'sdd_refresh_token'
