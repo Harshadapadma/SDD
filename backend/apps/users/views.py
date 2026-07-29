@@ -767,3 +767,111 @@ class UserStatsView(APIView):
             "inactive_users": inactive_users,
             "blacklisted_users": blacklisted_users
         })
+
+
+class MeasureBreakdownView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        import time, socket, ssl, psycopg2, os
+        from urllib.parse import urlparse
+        from django.conf import settings
+        from apps.users.models import User
+        from apps.users.serializers import UserListSerializer
+
+        db_conf = settings.DATABASES['default']
+        db_url = os.getenv('DATABASE_URL', '')
+
+        host = db_conf.get('HOST') or '127.0.0.1'
+        port = int(db_conf.get('PORT') or 5432)
+        user = db_conf.get('USER') or ''
+        password = db_conf.get('PASSWORD') or ''
+        dbname = db_conf.get('NAME') or ''
+
+        if db_url and db_url.startswith('postgres'):
+            parsed = urlparse(db_url)
+            host = parsed.hostname or host
+            port = parsed.port or port
+            user = parsed.username or user
+            password = parsed.password or password
+            dbname = parsed.path.lstrip('/') or dbname
+
+        # 1. DNS Lookup
+        t0 = time.time()
+        try:
+            ip = socket.gethostbyname(host)
+            dns_time = round((time.time() - t0) * 1000, 2)
+        except Exception as e:
+            dns_time = round((time.time() - t0) * 1000, 2)
+            ip = str(e)
+
+        # 2. TCP Connection
+        t1 = time.time()
+        try:
+            sock = socket.create_connection((ip if '.' in ip else host, port), timeout=5)
+            tcp_time = round((time.time() - t1) * 1000, 2)
+        except Exception as e:
+            tcp_time = round((time.time() - t1) * 1000, 2)
+            sock = None
+
+        # 3. SSL Negotiation
+        ssl_time = 0.0
+        if sock:
+            t2 = time.time()
+            try:
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                ssl_sock = ctx.wrap_socket(sock, server_hostname=host)
+                ssl_time = round((time.time() - t2) * 1000, 2)
+                ssl_sock.close()
+            except Exception as e:
+                ssl_time = round((time.time() - t2) * 1000, 2)
+                if sock: sock.close()
+
+        # 4. Acquire PgBouncer Connection & Auth
+        t3 = time.time()
+        sql_exec_time = 0.0
+        try:
+            conn = psycopg2.connect(
+                dbname=dbname,
+                user=user,
+                password=password,
+                host=host,
+                port=port,
+                connect_timeout=5,
+                sslmode='require' if 'supabase' in host or 'render' in host else 'prefer'
+            )
+            pg_auth_time = round((time.time() - t3) * 1000, 2)
+
+            cursor = conn.cursor()
+            t4 = time.time()
+            cursor.execute("SELECT COUNT(*) FROM users_user;")
+            _ = cursor.fetchone()
+            sql_exec_time = round((time.time() - t4) * 1000, 2)
+            conn.close()
+        except Exception as e:
+            pg_auth_time = round((time.time() - t3) * 1000, 2)
+
+        # 5. Django ORM Query Execution Time
+        t5 = time.time()
+        users_qs = list(User.objects.all()[:20])
+        orm_time = round((time.time() - t5) * 1000, 2)
+
+        # 6. Serialization Time
+        t6 = time.time()
+        _ = UserListSerializer(users_qs, many=True).data
+        ser_time = round((time.time() - t6) * 1000, 2)
+
+        return Response({
+            "target_host": f"{host}:{port}",
+            "dns_lookup_ms": dns_time,
+            "tcp_connection_ms": tcp_time,
+            "ssl_negotiation_ms": ssl_time,
+            "acquire_pgbouncer_connection_ms": pg_auth_time,
+            "sql_execution_ms": sql_exec_time,
+            "django_orm_execution_ms": orm_time,
+            "serialization_ms": ser_time,
+            "sql_execution_under_50ms_confirmed": sql_exec_time < 50,
+        })

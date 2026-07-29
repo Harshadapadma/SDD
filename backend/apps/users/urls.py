@@ -5,7 +5,7 @@ from .views import (
     VerifySetupTokenView, PingUserView, ChangePasswordView,
     ForgotPasswordView, UserStatsView,
     CookieTokenRefreshView, LogoutView,
-    ResendActivationView
+    ResendActivationView, MeasureBreakdownView
 )
 
 urlpatterns = [
@@ -25,4 +25,5 @@ urlpatterns = [
     path('users/<str:public_id>/change-role/', ChangeRoleView.as_view(), name='change-role'),
     path('users/<str:public_id>/ping/', PingUserView.as_view(), name='ping-user'),
     path('dashboard-stats/', DashboardStatsView.as_view(), name='dashboard-stats'),
+    path('measure-breakdown/', MeasureBreakdownView.as_view(), name='measure-breakdown'),
 ]
