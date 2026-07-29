@@ -8,6 +8,7 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.throttling import AnonRateThrottle
 
+import threading
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes
@@ -297,26 +298,29 @@ class CreateUserView(APIView):
 
             frontend_url = f"{settings.FRONTEND_URL}/set-password?uid={uid}&token={token}"
 
-            # Send HTML Email
-            try:
-                subject, html_body = get_account_created_email(
-                    name=user.name,
-                    email=user.email,
-                    role=user.role,
-                    public_id=user.public_id,
-                    setup_url=frontend_url,
-                )
-                send_sdd_email(
-                    subject=subject,
-                    message=f"Hello {user.name},\n\nYour account has been created. Please visit {frontend_url} to set your password.",
-                    recipient_list=[user.email],
-                    html_message=html_body,
-                    fail_silently=False,
-                )
-                log_security_event('ACTIVATION_SENT', request, user, f'Account creation activation email sent to {user.email}')
-            except Exception as e:
-                log_security_event('EMAIL_FAILED', request, user, f'Failed to send account creation email: {e}', level='ERROR')
-                print(f"[CreateUserView] Failed to send email to {user.email}: {e}")
+            # Send HTML Email (Asynchronous non-blocking execution)
+            def _send_async():
+                try:
+                    subject, html_body = get_account_created_email(
+                        name=user.name,
+                        email=user.email,
+                        role=user.role,
+                        public_id=user.public_id,
+                        setup_url=frontend_url,
+                    )
+                    send_sdd_email(
+                        subject=subject,
+                        message=f"Hello {user.name},\n\nYour account has been created. Please visit {frontend_url} to set your password.",
+                        recipient_list=[user.email],
+                        html_message=html_body,
+                        fail_silently=True,
+                    )
+                    log_security_event('ACTIVATION_SENT', request, user, f'Account creation activation email sent to {user.email}')
+                except Exception as e:
+                    log_security_event('EMAIL_FAILED', request, user, f'Failed to send account creation email: {e}', level='ERROR')
+                    print(f"[CreateUserView] Failed to send email to {user.email}: {e}")
+
+            threading.Thread(target=_send_async, daemon=True).start()
 
             return Response({
                 "message": "User created successfully",
