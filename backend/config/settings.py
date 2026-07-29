@@ -97,15 +97,15 @@ import dj_database_url
 
 DATABASE_URL = os.getenv('DATABASE_URL')
 if DATABASE_URL:
-    # Detect if DATABASE_URL connects to a PgBouncer / Session Pooler (pooler domain or port 6543)
-    is_pooler = 'pooler' in DATABASE_URL.lower() or ':6543' in DATABASE_URL
-    max_age = 0 if is_pooler else 600
-
+    # Session Pooler (port 5432/6543) supports persistent connections.
+    # conn_max_age=600 keeps connections alive for 10 min, avoiding
+    # costly TCP+SSL+PgBouncer handshakes on every single request.
+    # conn_health_checks=False avoids an extra SELECT 1 before every query.
     DATABASES = {
         'default': dj_database_url.config(
             default=DATABASE_URL,
-            conn_max_age=max_age,
-            conn_health_checks=True,
+            conn_max_age=600,
+            conn_health_checks=False,
             ssl_require=True,
         )
     }
@@ -181,7 +181,7 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'AUTH_HEADER_TYPES': ('Bearer',),
     'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': False,
+    'BLACKLIST_AFTER_ROTATION': True,
     'UPDATE_LAST_LOGIN': False,
 }
 

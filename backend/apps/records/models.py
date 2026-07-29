@@ -56,7 +56,8 @@ class Record(models.Model):
             ('PENDING_EDITION', 'Pending Edition'),
             ('REJECTED', 'Rejected'),
         ],
-        default='PENDING_CREATION'
+        default='PENDING_CREATION',
+        db_index=True
     )
 
     @classmethod

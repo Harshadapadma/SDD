@@ -112,7 +112,8 @@ class RecordListView(APIView):
             else:
                 queryset = Record.objects.filter(user_access__user=user, status='APPROVED')
 
-        queryset = queryset.order_by('-created_at')
+        # Eagerly load relations to avoid N+1 queries in serializer
+        queryset = queryset.select_related('created_by').prefetch_related('user_access').order_by('-created_at')
 
         # 🔍 Search
         search = request.GET.get('search')
@@ -357,7 +358,12 @@ class RecordDetailView(APIView):
 
     def get(self, request, record_id):
         try:
-            record = Record.objects.get(public_id=record_id)
+            # Eagerly load relations to avoid N+1 queries
+            record = Record.objects.select_related(
+                'created_by', 'updated_by'
+            ).prefetch_related(
+                'user_access__user'
+            ).get(public_id=record_id)
         except Record.DoesNotExist:
             return Response({"error": "Record not found"}, status=404)
 
@@ -369,19 +375,19 @@ class RecordDetailView(APIView):
         elif user.role != "COMPLIANCE_OFFICER":
             if record.status == 'PENDING_CREATION' and record.created_by != user:
                 return Response({"error": "Permission denied"}, status=403)
-            has_access = RecordAccess.objects.filter(user=user, record=record).exists()
+            # Use prefetched data for access check
+            has_access = any(a.user_id == user.id for a in record.user_access.all())
             if not has_access:
                 return Response({"error": "Permission denied"}, status=403)
 
-        # Basic record data
+        # Basic record data (serializer will use prefetched data)
         serializer = RecordDetailSerializer(record, context={"request": request})
         data = serializer.data
 
-        # If admin or compliance officer, add access details
+        # If admin or compliance officer, add access details (uses prefetched data)
         if user.role in ["ADMIN", "COMPLIANCE_OFFICER"]:
-            accesses = RecordAccess.objects.filter(record=record)
             access_list = []
-            for acc in accesses:
+            for acc in record.user_access.all():
                 access_list.append({
                     "user_name": acc.user.name,
                     "user_id": acc.user.public_id,

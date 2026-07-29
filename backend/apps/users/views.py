@@ -496,6 +496,9 @@ class UserListView(APIView):
         if role:
             queryset = queryset.filter(role=role)
 
+        # Prefetch record access data to avoid N+1 queries in serializer
+        queryset = queryset.prefetch_related('record_access__record')
+
         paginator = UserPagination()
         paginated_queryset = paginator.paginate_queryset(queryset, request)
 
@@ -641,6 +644,8 @@ from apps.records.models import Record
 from apps.workflows.models import DeleteRequest, AccessRequest, RoleChangeRequest, CreationRequest, EditRequest
 from django.utils import timezone
 from datetime import timedelta
+from django.db.models import Count
+from django.db.models.functions import TruncDate, TruncMonth
 
 class DashboardStatsView(APIView):
     permission_classes = [IsAuthenticated]
@@ -649,61 +654,87 @@ class DashboardStatsView(APIView):
         if request.user.role not in ["ADMIN", "COMPLIANCE_OFFICER"]:
             return Response({"error": "Permission denied"}, status=403)
 
-        # 1. Total counts
-        total_users = User.objects.exclude(role='ADMIN').exclude(role='COMPLIANCE_OFFICER').count()
-        total_records = Record.objects.count()
-        
-        pending_delete = DeleteRequest.objects.filter(status="PENDING").count()
-        pending_access = AccessRequest.objects.filter(status="PENDING").count()
-        pending_role = RoleChangeRequest.objects.filter(status="PENDING").count()
-        pending_creation = CreationRequest.objects.filter(status="PENDING").count()
-        pending_edit = EditRequest.objects.filter(status="PENDING").count()
-        total_pending = pending_delete + pending_access + pending_role + pending_creation + pending_edit
-
-        # 2. User Distribution by Role
-        role_dist = {
-            "ADMIN": User.objects.filter(role="ADMIN").count(),
-            "COMPLIANCE_OFFICER": User.objects.filter(role="COMPLIANCE_OFFICER").count(),
-            "COLLABORATOR": User.objects.filter(role="COLLABORATOR").count(),
-            "VIEWER": User.objects.filter(role="VIEWER").count(),
-        }
-
-        # 3. Record Growth (Last 14 Days)
         today = timezone.now().date()
+
+        # 1. Total counts — single query for users with role distribution
+        role_counts = dict(
+            User.objects.values_list('role').annotate(c=Count('id')).values_list('role', 'c')
+        )
+        role_dist = {
+            "ADMIN": role_counts.get("ADMIN", 0),
+            "COMPLIANCE_OFFICER": role_counts.get("COMPLIANCE_OFFICER", 0),
+            "COLLABORATOR": role_counts.get("COLLABORATOR", 0),
+            "VIEWER": role_counts.get("VIEWER", 0),
+        }
+        total_all_users = sum(role_counts.values())
+        total_users = total_all_users - role_dist["ADMIN"] - role_dist["COMPLIANCE_OFFICER"]
+
+        total_records = Record.objects.count()
+
+        # 2. Workflow status counts — one query per model instead of 3-5 per model
+        def _status_counts(model):
+            return dict(model.objects.values_list('status').annotate(c=Count('id')).values_list('status', 'c'))
+
+        del_counts = _status_counts(DeleteRequest)
+        acc_counts = _status_counts(AccessRequest)
+        role_req_counts = _status_counts(RoleChangeRequest)
+        cre_counts = _status_counts(CreationRequest)
+        edit_counts = _status_counts(EditRequest)
+
+        all_wf_counts = [del_counts, acc_counts, role_req_counts, cre_counts, edit_counts]
+        status_dist = {}
+        total_requests_all = 0
+        for s in ["PENDING", "APPROVED", "REJECTED"]:
+            status_dist[s] = sum(wf.get(s, 0) for wf in all_wf_counts)
+        for wf in all_wf_counts:
+            total_requests_all += sum(wf.values())
+
+        total_pending = status_dist["PENDING"]
+        approved_requests = status_dist["APPROVED"]
+        rejected_requests = status_dist["REJECTED"]
+
+        # 3. Record Growth (Last 14 Days) — single aggregated query
+        fourteen_days_ago = today - timedelta(days=13)
+        daily_counts = dict(
+            Record.objects.filter(created_at__date__gte=fourteen_days_ago)
+            .annotate(day=TruncDate('created_at'))
+            .values('day')
+            .annotate(c=Count('id'))
+            .values_list('day', 'c')
+        )
         growth_data = []
         for i in range(13, -1, -1):
             date = today - timedelta(days=i)
-            count = Record.objects.filter(created_at__date=date).count()
             growth_data.append({
                 "date": date.strftime("%d %b"),
+                "count": daily_counts.get(date, 0)
+            })
+
+        # 4. Monthly Records (Last 6 Months) — single aggregated query
+        six_months_ago = (today.replace(day=1) - timedelta(days=150))
+        monthly_counts = dict(
+            Record.objects.filter(created_at__date__gte=six_months_ago)
+            .annotate(month=TruncMonth('created_at'))
+            .values('month')
+            .annotate(c=Count('id'))
+            .values_list('month', 'c')
+        )
+        monthly_records = []
+        for i in range(5, -1, -1):
+            m_date = (today.replace(day=1) - timedelta(days=30 * i))
+            # TruncMonth returns datetime, match by year/month
+            count = 0
+            for dt, c in monthly_counts.items():
+                if hasattr(dt, 'year') and dt.year == m_date.year and dt.month == m_date.month:
+                    count = c
+                    break
+            monthly_records.append({
+                "month": m_date.strftime("%b %Y"),
                 "count": count
             })
 
-        # 4. Request Status (Combined)
-        all_statuses = ["PENDING", "APPROVED", "REJECTED"]
-        status_dist = {}
-        for s in all_statuses:
-            count = (
-                DeleteRequest.objects.filter(status=s).count() +
-                AccessRequest.objects.filter(status=s).count() +
-                RoleChangeRequest.objects.filter(status=s).count() +
-                CreationRequest.objects.filter(status=s).count() +
-                EditRequest.objects.filter(status=s).count()
-            )
-            status_dist[s] = count
-
-        # 5. Application & Database Infographics Data
+        # 5. Infographics
         from apps.workflows.models import ClarificationMessage
-        total_all_users = User.objects.count()
-        total_requests_all = (
-            DeleteRequest.objects.count() +
-            AccessRequest.objects.count() +
-            RoleChangeRequest.objects.count() +
-            CreationRequest.objects.count() +
-            EditRequest.objects.count()
-        )
-        approved_requests = status_dist.get("APPROVED", 0)
-        rejected_requests = status_dist.get("REJECTED", 0)
         total_clarifications = ClarificationMessage.objects.count()
 
         infographics = {
@@ -727,16 +758,6 @@ class DashboardStatsView(APIView):
                 "security": "JWT + RBAC + MFA Active"
             }
         }
-
-        # 6. Monthly Records (Last 6 Months)
-        monthly_records = []
-        for i in range(5, -1, -1):
-            m_date = (today.replace(day=1) - timedelta(days=30 * i))
-            count = Record.objects.filter(created_at__year=m_date.year, created_at__month=m_date.month).count()
-            monthly_records.append({
-                "month": m_date.strftime("%b %Y"),
-                "count": count
-            })
 
         return Response({
             "overview": {

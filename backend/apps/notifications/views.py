@@ -1,9 +1,16 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.pagination import PageNumberPagination
 
 from .models import Notification
 from .serializers import NotificationSerializer
+
+
+class NotificationPagination(PageNumberPagination):
+    page_size = 50
+    page_size_query_param = 'page_size'
+    max_page_size = 100
 
 
 # -------------------------------
@@ -17,8 +24,11 @@ class NotificationListView(APIView):
             user=request.user
         ).order_by('-created_at')
 
-        serializer = NotificationSerializer(notifications, many=True)
-        return Response(serializer.data)
+        paginator = NotificationPagination()
+        paginated = paginator.paginate_queryset(notifications, request)
+
+        serializer = NotificationSerializer(paginated, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
 
 # -------------------------------
@@ -28,15 +38,13 @@ class MarkNotificationReadView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, notification_id):
-        try:
-            notification = Notification.objects.get(
-                id=notification_id,
-                user=request.user
-            )
-        except Notification.DoesNotExist:
-            return Response({"error": "Not found"}, status=404)
+        # Use update() to avoid fetching the full object — single UPDATE query
+        updated = Notification.objects.filter(
+            id=notification_id,
+            user=request.user
+        ).update(is_read=True)
 
-        notification.is_read = True
-        notification.save()
+        if not updated:
+            return Response({"error": "Not found"}, status=404)
 
         return Response({"message": "Marked as read"})

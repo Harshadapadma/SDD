@@ -135,8 +135,8 @@ function formatTime(d: string) {
 async function fetchNotifications() {
   loading.value = true
   try {
-    const res = await api.get('notifications/')
-    notifications.value = res.data
+    const res = await api.get('notifications/', { params: { page_size: 50 } })
+    notifications.value = res.data.results || res.data
   } catch (e) {
     console.error(e)
   } finally {

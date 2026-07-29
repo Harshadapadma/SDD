@@ -29,5 +29,10 @@ class Notification(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['user', 'is_read', '-created_at'], name='notif_user_read_idx'),
+        ]
+
     def __str__(self):
         return f"{self.user.public_id} - {self.title}"

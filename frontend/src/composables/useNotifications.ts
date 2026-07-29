@@ -64,8 +64,8 @@ export function useNotifications() {
   async function fetchNotifications() {
     fetchPendingRequestsCount()
     try {
-      const res = await api.get('notifications/')
-      const fetched: any[] = res.data
+      const res = await api.get('notifications/', { params: { page_size: 50 } })
+      const fetched: any[] = res.data.results || res.data
 
       // Detect brand-new notifications (not seen before)
       if (seenIds.size > 0 && !isMuted.value) {

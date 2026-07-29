@@ -157,9 +157,16 @@ class RecordListSerializer(serializers.ModelSerializer):
         if user.role == 'VIEWER':
             return 'VIEW' # Viewers always have View Only access
 
-        from .models import RecordAccess
-        access = RecordAccess.objects.filter(record=obj, user=user).first()
-        return access.access_type if access else None
+        # Use prefetched user_access to avoid N+1 queries
+        try:
+            for a in obj.user_access.all():
+                if a.user_id == user.id:
+                    return a.access_type
+            return None
+        except AttributeError:
+            from .models import RecordAccess
+            access = RecordAccess.objects.filter(record=obj, user=user).first()
+            return access.access_type if access else None
 
 # -------------------------------
 # Detail Record Serializer
@@ -186,9 +193,16 @@ class RecordDetailSerializer(serializers.ModelSerializer):
         user = request.user
         if user.role in ['ADMIN', 'COMPLIANCE_OFFICER']: return 'EDIT'
         if user.role == 'VIEWER': return 'VIEW'
-        from .models import RecordAccess
-        access = RecordAccess.objects.filter(record=obj, user=user).first()
-        return access.access_type if access else None
+        # Use prefetched user_access to avoid N+1 queries
+        try:
+            for a in obj.user_access.all():
+                if a.user_id == user.id:
+                    return a.access_type
+            return None
+        except AttributeError:
+            from .models import RecordAccess
+            access = RecordAccess.objects.filter(record=obj, user=user).first()
+            return access.access_type if access else None
 
     def get_access_list(self, obj):
         request = self.context.get('request')
@@ -196,8 +210,12 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             return []
         if request.user.role not in ['ADMIN', 'COMPLIANCE_OFFICER']:
             return []
-        from .models import RecordAccess
-        accesses = RecordAccess.objects.filter(record=obj).select_related('user')
+        # Use prefetched user_access data to avoid N+1 queries
+        try:
+            accesses = obj.user_access.all()
+        except AttributeError:
+            from .models import RecordAccess
+            accesses = RecordAccess.objects.filter(record=obj).select_related('user')
         return [
             {
                 "user_id": a.user.public_id,

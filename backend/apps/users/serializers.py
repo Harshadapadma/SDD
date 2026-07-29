@@ -155,8 +155,13 @@ class UserListSerializer(serializers.ModelSerializer):
         ]
 
     def get_records_access(self, obj):
-        from apps.records.models import RecordAccess
-        accesses = RecordAccess.objects.filter(user=obj).select_related('record')
+        # Use prefetched record_access data to avoid N+1 queries.
+        # The view should call prefetch_related('record_access__record') on the queryset.
+        try:
+            accesses = obj.record_access.all()
+        except AttributeError:
+            from apps.records.models import RecordAccess
+            accesses = RecordAccess.objects.filter(user=obj).select_related('record')
         return [
             {
                 "record_id": a.record.public_id,

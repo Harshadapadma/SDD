@@ -61,13 +61,14 @@ class User(AbstractBaseUser, PermissionsMixin):
     role = models.CharField(
         max_length=20,
         choices=UserRole.choices,
-        default=UserRole.VIEWER
+        default=UserRole.VIEWER,
+        db_index=True
     )
 
     # Status flags
-    is_active = models.BooleanField(default=False)  # user activates via email
+    is_active = models.BooleanField(default=False, db_index=True)  # user activates via email
     is_staff = models.BooleanField(default=False)
-    is_blacklisted = models.BooleanField(default=False)
+    is_blacklisted = models.BooleanField(default=False, db_index=True)
 
     # Profile details
     designation = models.CharField(max_length=255, blank=True, null=True)

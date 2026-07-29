@@ -19,7 +19,8 @@ class DeleteRequest(models.Model):
     status = models.CharField(
         max_length=10,
         choices=DeleteRequestStatus.choices,
-        default=DeleteRequestStatus.PENDING
+        default=DeleteRequestStatus.PENDING,
+        db_index=True
     )
 
     reviewed_by = models.ForeignKey(
@@ -48,7 +49,8 @@ class AccessRequest(models.Model):
     status = models.CharField(
         max_length=10,
         choices=DeleteRequestStatus.choices,
-        default=DeleteRequestStatus.PENDING
+        default=DeleteRequestStatus.PENDING,
+        db_index=True
     )
     
     reviewed_by = models.ForeignKey(
@@ -68,7 +70,8 @@ class RoleChangeRequest(models.Model):
     status = models.CharField(
         max_length=10,
         choices=DeleteRequestStatus.choices,
-        default=DeleteRequestStatus.PENDING
+        default=DeleteRequestStatus.PENDING,
+        db_index=True
     )
     
     reviewed_by = models.ForeignKey(
@@ -91,7 +94,8 @@ class CreationRequest(models.Model):
     status = models.CharField(
         max_length=10,
         choices=DeleteRequestStatus.choices,
-        default=DeleteRequestStatus.PENDING
+        default=DeleteRequestStatus.PENDING,
+        db_index=True
     )
     reviewed_by = models.ForeignKey(
         User,
@@ -120,7 +124,8 @@ class EditRequest(models.Model):
     status = models.CharField(
         max_length=10,
         choices=DeleteRequestStatus.choices,
-        default=DeleteRequestStatus.PENDING
+        default=DeleteRequestStatus.PENDING,
+        db_index=True
     )
     proposed_data = models.JSONField()
     reviewed_by = models.ForeignKey(

@@ -61,7 +61,9 @@ class DeleteRequestListView(APIView):
         if request.user.role != "COMPLIANCE_OFFICER":
             return Response({"error": "Only Compliance Officer"}, status=403)
 
-        requests = DeleteRequest.objects.all().order_by('-created_at')
+        requests = DeleteRequest.objects.select_related(
+            'requested_by', 'record', 'reviewed_by'
+        ).all().order_by('-created_at')
         serializer = DeleteRequestSerializer(requests, many=True)
 
         return Response(serializer.data)
@@ -170,7 +172,9 @@ class RoleChangeRequestListView(APIView):
         if request.user.role != "COMPLIANCE_OFFICER":
             return Response({"error": "Only Compliance Officer"}, status=403)
 
-        requests = RoleChangeRequest.objects.all().order_by('-created_at')
+        requests = RoleChangeRequest.objects.select_related(
+            'user', 'reviewed_by'
+        ).all().order_by('-created_at')
         serializer = RoleChangeRequestSerializer(requests, many=True)
 
         return Response(serializer.data)
@@ -231,19 +235,19 @@ class UserRequestsListView(APIView):
     def get(self, request):
         user = request.user
         
-        # Get all types
-        deletes = DeleteRequest.objects.filter(requested_by=user).order_by('-created_at')
-        roles = RoleChangeRequest.objects.filter(user=user).order_by('-created_at')
-        access = AccessRequest.objects.filter(user=user).order_by('-created_at')
-        creations = CreationRequest.objects.filter(requested_by=user).order_by('-created_at')
-        edits = EditRequest.objects.filter(requested_by=user).order_by('-created_at')
+        # Get all types with select_related to avoid N+1 queries
+        deletes = DeleteRequest.objects.filter(requested_by=user).select_related('record', 'reviewed_by').order_by('-created_at')
+        roles = RoleChangeRequest.objects.filter(user=user).select_related('reviewed_by').order_by('-created_at')
+        access = AccessRequest.objects.filter(user=user).select_related('record', 'reviewed_by').order_by('-created_at')
+        creations = CreationRequest.objects.filter(requested_by=user).select_related('record', 'reviewed_by').order_by('-created_at')
+        edits = EditRequest.objects.filter(requested_by=user).select_related('record', 'reviewed_by').order_by('-created_at')
         
         return Response({
             "delete_requests": DeleteRequestSerializer(deletes, many=True).data,
             "role_requests": RoleChangeRequestSerializer(roles, many=True).data,
             "access_requests": AccessRequestSerializer(access, many=True).data,
-            "creation_requests": CreationRequestSerializer(creations, many=True).data,
-            "edit_requests": EditRequestSerializer(edits, many=True).data
+            "creation_requests": CreationRequestSerializer(creations, many=True, context={"request": request}).data,
+            "edit_requests": EditRequestSerializer(edits, many=True, context={"request": request}).data
         })
 
 
@@ -337,7 +341,9 @@ class AccessRequestListView(APIView):
         if request.user.role != "COMPLIANCE_OFFICER":
             return Response({"error": "Only Compliance Officer"}, status=403)
 
-        requests = AccessRequest.objects.all().order_by('-created_at')
+        requests = AccessRequest.objects.select_related(
+            'user', 'record', 'reviewed_by'
+        ).all().order_by('-created_at')
         serializer = AccessRequestSerializer(requests, many=True)
 
         return Response(serializer.data)
@@ -410,8 +416,10 @@ class CreationRequestListView(APIView):
         if request.user.role != "COMPLIANCE_OFFICER":
             return Response({"error": "Only Compliance Officer"}, status=403)
 
-        requests = CreationRequest.objects.all().order_by('-created_at')
-        serializer = CreationRequestSerializer(requests, many=True)
+        requests = CreationRequest.objects.select_related(
+            'requested_by', 'record', 'reviewed_by'
+        ).all().order_by('-created_at')
+        serializer = CreationRequestSerializer(requests, many=True, context={"request": request})
         return Response(serializer.data)
 
 
@@ -471,8 +479,10 @@ class EditRequestListView(APIView):
         if request.user.role != "COMPLIANCE_OFFICER":
             return Response({"error": "Only Compliance Officer"}, status=403)
 
-        requests = EditRequest.objects.all().order_by('-created_at')
-        serializer = EditRequestSerializer(requests, many=True)
+        requests = EditRequest.objects.select_related(
+            'requested_by', 'record', 'reviewed_by'
+        ).all().order_by('-created_at')
+        serializer = EditRequestSerializer(requests, many=True, context={"request": request})
         return Response(serializer.data)
 
 
@@ -536,9 +546,15 @@ class AuditLogView(APIView):
         if request.user.role != "COMPLIANCE_OFFICER":
             return Response({"error": "Permission denied"}, status=403)
 
-        creations = CreationRequest.objects.filter(status='APPROVED').order_by('-updated_at')
-        editions = EditRequest.objects.filter(status='APPROVED').order_by('-updated_at')
-        deletions = DeleteRequest.objects.filter(status='APPROVED').order_by('-updated_at')
+        creations = CreationRequest.objects.filter(status='APPROVED').select_related(
+            'requested_by', 'reviewed_by', 'record'
+        ).order_by('-updated_at')
+        editions = EditRequest.objects.filter(status='APPROVED').select_related(
+            'requested_by', 'reviewed_by', 'record'
+        ).order_by('-updated_at')
+        deletions = DeleteRequest.objects.filter(status='APPROVED').select_related(
+            'requested_by', 'reviewed_by', 'record'
+        ).order_by('-updated_at')
 
         return Response({
             "creations": CreationAuditSerializer(creations, many=True).data,
