@@ -118,6 +118,16 @@
             </button>
             <button 
               v-if="!u.is_active" 
+              class="icon-action link" 
+              title="Copy / Regenerate Setup Link" 
+              @click="copyOrRegenerateSetupLink(u)"
+              :disabled="generatingLinkId === u.public_id"
+            >
+              <i class="fas fa-spinner fa-spin" v-if="generatingLinkId === u.public_id"></i>
+              <i class="fas fa-link" v-else></i>
+            </button>
+            <button 
+              v-if="!u.is_active" 
               class="icon-action mail" 
               title="Resend Activation Email" 
               @click="resendActivation(u)"
@@ -340,6 +350,43 @@
     </div>
     </teleport>
 
+    <!-- ─── CREATED USER SUCCESS MODAL WITH COPY LINK ────────────────── -->
+    <teleport to="body">
+    <div class="modal-overlay" v-if="showSuccessModal" @click.self="showSuccessModal = false">
+      <div class="modal modal-md">
+        <div class="modal-header">
+          <div class="modal-title-group">
+            <div class="modal-icon-wrap success-badge"><i class="fas fa-user-check"></i></div>
+            <h2>User Created Successfully</h2>
+          </div>
+          <button class="modal-close" @click="showSuccessModal = false" aria-label="Close"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-desc">
+            Account for <strong>{{ createdUserObj?.name }}</strong> ({{ createdUserObj?.email }}) has been created with role <strong>{{ createdUserObj?.role }}</strong>.
+            An activation email was queued in the background. You can also directly copy and share the secure setup link below:
+          </p>
+
+          <div class="setup-link-card" v-if="createdUserSetupUrl">
+            <div class="link-label"><i class="fas fa-key"></i> Direct Account Setup Link</div>
+            <div class="link-input-group">
+              <input type="text" readonly :value="createdUserSetupUrl" class="link-url-input" @click="selectInputText" />
+              <button class="btn-primary copy-btn" @click="copyToClipboard(createdUserSetupUrl, 'Setup link')">
+                <i class="fas fa-copy"></i> Copy Link
+              </button>
+            </div>
+            <div class="link-hint">
+              <i class="fas fa-shield-halved"></i> Share this secure link with the user so they can activate their account and set a password.
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-primary" @click="showSuccessModal = false">Done</button>
+        </div>
+      </div>
+    </div>
+    </teleport>
+
   </div>
 </template>
 
@@ -525,11 +572,15 @@ async function createUser() {
   creating.value = true
   createError.value = ''
   try {
-    await api.post('auth/create-user/', form.value)
-    notify('User Created', `Successfully added ${form.value.name}. Activation link sent.`, 'SUCCESS')
+    const res = await api.post('auth/create-user/', form.value)
     showCreate.value = false
+    createdUserObj.value = res.data.user
+    createdUserSetupUrl.value = res.data.setup_url || ''
+    showSuccessModal.value = true
     form.value = { name: '', email: '', role: 'VIEWER' }
     fetchUsers()
+    fetchUserStats()
+    notify('User Created', `Successfully added ${createdUserObj.value?.name}. Activation link generated.`, 'SUCCESS')
   } catch (e: any) {
     const data = e?.response?.data
     if (data && typeof data === 'object') {
@@ -552,6 +603,62 @@ function closeCreate() {
   showCreate.value = false
   createError.value = ''
   form.value = { name: '', email: '', role: 'VIEWER' }
+}
+
+// ─── Setup Link Fallback Features ──────────────────────────────
+const showSuccessModal = ref(false)
+const createdUserObj = ref<any>(null)
+const createdUserSetupUrl = ref('')
+const generatingLinkId = ref<string | null>(null)
+
+function copyToClipboard(text: string, label: string = 'Setup link') {
+  if (!text) return
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(() => {
+      notify('Link Copied', `${label} copied to clipboard.`, 'SUCCESS')
+    }).catch(() => {
+      fallbackCopyText(text, label)
+    })
+  } else {
+    fallbackCopyText(text, label)
+  }
+}
+
+function fallbackCopyText(text: string, label: string) {
+  try {
+    const input = document.createElement('input')
+    input.value = text
+    document.body.appendChild(input)
+    input.select()
+    document.execCommand('copy')
+    document.body.removeChild(input)
+    notify('Link Copied', `${label} copied to clipboard.`, 'SUCCESS')
+  } catch (e) {
+    notify('Copy Failed', 'Please copy the link manually.', 'WARNING')
+  }
+}
+
+function selectInputText(e: Event) {
+  const el = e.target as HTMLInputElement
+  if (el) el.select()
+}
+
+async function copyOrRegenerateSetupLink(user: any) {
+  generatingLinkId.value = user.public_id
+  try {
+    const res = await api.post('auth/resend-activation/', { public_id: user.public_id })
+    const link = res.data.setup_url
+    if (link) {
+      copyToClipboard(link, `Activation link for ${user.name}`)
+    } else {
+      notify('Activation Sent', `Activation email triggered for ${user.email}.`, 'SUCCESS')
+    }
+  } catch (e: any) {
+    const msg = e.response?.data?.error || 'Failed to generate setup link.'
+    notify('Action Failed', msg, 'ERROR')
+  } finally {
+    generatingLinkId.value = null
+  }
 }
 </script>
 
@@ -840,4 +947,16 @@ function closeCreate() {
 .btn-danger:hover { background: var(--error-700); }
 
 @media (max-width: 900px) { .stats-row { grid-template-columns: repeat(2, 1fr); } }
+
+/* Fallback Link Modal & Button Styles */
+.icon-action.link { color: var(--orange-accent); border-color: rgba(234, 108, 0, 0.3); }
+.icon-action.link:hover { background: var(--orange-bg-subtle); border-color: var(--orange-accent); }
+.success-badge { background: var(--success-bg); color: var(--success-700); }
+.modal-desc { font-size: var(--text-xs); color: var(--text-secondary); line-height: 1.5; margin-bottom: 16px; }
+.setup-link-card { background: var(--bg-card); border: 1px solid var(--orange-border); border-radius: var(--radius-lg); padding: 14px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 10px; }
+.link-label { font-size: 11px; font-weight: 800; color: var(--orange-accent); display: flex; align-items: center; gap: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+.link-input-group { display: flex; gap: 8px; align-items: center; }
+.link-url-input { flex: 1; padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid rgba(166, 169, 173, 0.5); font-family: monospace; font-size: 11px; color: var(--text-primary); background: var(--bg-input); outline: none; }
+.copy-btn { white-space: nowrap; font-size: 11px; padding: 8px 14px; }
+.link-hint { font-size: 10.5px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
 </style>

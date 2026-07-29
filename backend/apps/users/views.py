@@ -379,34 +379,34 @@ class ResendActivationView(APIView):
         token = default_token_generator.make_token(user)
         frontend_url = f"{settings.FRONTEND_URL}/set-password?uid={uid}&token={token}"
 
-        try:
-            subject, html_body = get_account_created_email(
-                name=user.name,
-                email=user.email,
-                role=user.role,
-                public_id=user.public_id,
-                setup_url=frontend_url,
-            )
-            send_sdd_email(
-                subject=subject,
-                message=f"Hello {user.name},\n\nYour account activation link: {frontend_url}",
-                recipient_list=[user.email],
-                html_message=html_body,
-                fail_silently=False,
-            )
-            log_security_event('ACTIVATION_RESENT', request, user, f'Activation email resent to {user.email}')
-            return Response({
-                "message": f"Activation email resent successfully to {user.email}.",
-                "setup_url": frontend_url
-            })
-        except Exception as e:
-            tb_str = traceback.format_exc()
-            log_security_event('EMAIL_FAILED', request, user, f'Failed to resend activation email: {e}\n{tb_str}', level='ERROR')
-            print(f"[ResendActivationView] Failed to send email to {user.email}: {e}\nFULL TRACEBACK:\n{tb_str}", flush=True)
-            return Response(
-                {"error": f"Failed to send email: {str(e)}", "setup_url": frontend_url},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        def _send_async():
+            try:
+                subject, html_body = get_account_created_email(
+                    name=user.name,
+                    email=user.email,
+                    role=user.role,
+                    public_id=user.public_id,
+                    setup_url=frontend_url,
+                )
+                send_sdd_email(
+                    subject=subject,
+                    message=f"Hello {user.name},\n\nYour account activation link: {frontend_url}",
+                    recipient_list=[user.email],
+                    html_message=html_body,
+                    fail_silently=True,
+                )
+                log_security_event('ACTIVATION_RESENT', request, user, f'Activation email resent to {user.email}')
+            except Exception as e:
+                tb_str = traceback.format_exc()
+                log_security_event('EMAIL_FAILED', request, user, f'Failed to resend activation email: {e}\n{tb_str}', level='ERROR')
+                print(f"[ResendActivationView] Failed to send email to {user.email}: {e}\nFULL TRACEBACK:\n{tb_str}", flush=True)
+
+        threading.Thread(target=_send_async, daemon=True).start()
+
+        return Response({
+            "message": f"Activation link generated for {user.email}.",
+            "setup_url": frontend_url
+        })
 
 
 # -------------------------------
