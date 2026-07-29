@@ -103,8 +103,24 @@ def send_sdd_email(
     Sends an HTML/text email with Negen SDD logo attached as an inline CID image (cid:negen_logo).
     This guarantees that Gmail, Outlook, Apple Mail, etc. display the logo natively without blocking it.
     """
+    import sys
+    import traceback
+
     if from_email is None:
         from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'webmaster@localhost')
+
+    email_host = getattr(settings, 'EMAIL_HOST', 'N/A')
+    email_port = getattr(settings, 'EMAIL_PORT', 'N/A')
+    email_user = getattr(settings, 'EMAIL_HOST_USER', 'N/A')
+    use_tls = getattr(settings, 'EMAIL_USE_TLS', False)
+    use_ssl = getattr(settings, 'EMAIL_USE_SSL', False)
+    timeout = getattr(settings, 'EMAIL_TIMEOUT', None)
+
+    print(
+        f"[send_sdd_email] BEFORE SEND -> Subject: '{subject}' | To: {recipient_list} | From: '{from_email}' | "
+        f"Host: {email_host}:{email_port} | TLS={use_tls} SSL={use_ssl} Timeout={timeout} User='{email_user}'",
+        flush=True
+    )
 
     msg = EmailMultiAlternatives(
         subject=subject,
@@ -137,17 +153,26 @@ def send_sdd_email(
                     img.save(buf, format="PNG", optimize=True)
                     logo_bytes = buf.getvalue()
             except Exception as pe:
-                print(f"[send_sdd_email] Pillow thumbnail failed ({pe}), using raw bytes")
+                print(f"[send_sdd_email] Pillow thumbnail failed ({pe}), using raw bytes", flush=True)
 
             img_mime = MIMEImage(logo_bytes, _subtype="png")
             img_mime.add_header("Content-ID", "<negen_logo>")
             img_mime.add_header("Content-Disposition", "inline", filename="logo.png")
             msg.attach(img_mime)
-            print(f"[send_sdd_email] Attached inline CID logo to email for {recipient_list}")
+            print(f"[send_sdd_email] Attached inline CID logo to email for {recipient_list}", flush=True)
         except Exception as e:
-            print(f"[send_sdd_email] Failed to attach inline logo: {e}")
+            print(f"[send_sdd_email] Failed to attach inline logo: {e}", flush=True)
 
-    return msg.send(fail_silently=fail_silently)
+    try:
+        res = msg.send(fail_silently=False)
+        print(f"[send_sdd_email] AFTER SEND SUCCESS -> Email sent to {recipient_list} (result={res})", flush=True)
+        return bool(res)
+    except Exception as e:
+        tb_str = traceback.format_exc()
+        print(f"[send_sdd_email] EXCEPTION SMTP FAILURE -> To: {recipient_list} | Error: {e}\nFULL TRACEBACK:\n{tb_str}", flush=True)
+        if not fail_silently:
+            raise
+        return False
 
 
 # ══════════════════════════════════════════════════════════════════════════════

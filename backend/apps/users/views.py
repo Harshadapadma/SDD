@@ -9,6 +9,8 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.throttling import AnonRateThrottle
 
 import threading
+import traceback
+import sys
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes
@@ -79,7 +81,8 @@ def _send_mfa_otp_email(user, otp_code: str):
             fail_silently=False,
         )
     except Exception as e:
-        print(f"[MFA] OTP email send failed: {e}")
+        tb_str = traceback.format_exc()
+        print(f"[MFA] OTP email send failed: {e}\nFULL TRACEBACK:\n{tb_str}", flush=True)
 
 
 # -------------------------------
@@ -135,7 +138,8 @@ class ForgotPasswordView(APIView):
                 fail_silently=False,
             )
         except Exception as e:
-            print(f'[ForgotPassword] Email send failed: {e}')
+            tb_str = traceback.format_exc()
+            print(f'[ForgotPassword] Email send failed: {e}\nFULL TRACEBACK:\n{tb_str}', flush=True)
             return Response(
                 {'error': 'Failed to send reset email. Please try again later.'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -317,8 +321,9 @@ class CreateUserView(APIView):
                     )
                     log_security_event('ACTIVATION_SENT', request, user, f'Account creation activation email sent to {user.email}')
                 except Exception as e:
-                    log_security_event('EMAIL_FAILED', request, user, f'Failed to send account creation email: {e}', level='ERROR')
-                    print(f"[CreateUserView] Failed to send email to {user.email}: {e}")
+                    tb_str = traceback.format_exc()
+                    log_security_event('EMAIL_FAILED', request, user, f'Failed to send account creation email: {e}\n{tb_str}', level='ERROR')
+                    print(f"[CreateUserView] Failed to send email to {user.email}: {e}\nFULL TRACEBACK:\n{tb_str}", flush=True)
 
             threading.Thread(target=_send_async, daemon=True).start()
 
@@ -395,7 +400,9 @@ class ResendActivationView(APIView):
                 "setup_url": frontend_url
             })
         except Exception as e:
-            log_security_event('EMAIL_FAILED', request, user, f'Failed to resend activation email: {e}', level='ERROR')
+            tb_str = traceback.format_exc()
+            log_security_event('EMAIL_FAILED', request, user, f'Failed to resend activation email: {e}\n{tb_str}', level='ERROR')
+            print(f"[ResendActivationView] Failed to send email to {user.email}: {e}\nFULL TRACEBACK:\n{tb_str}", flush=True)
             return Response(
                 {"error": f"Failed to send email: {str(e)}", "setup_url": frontend_url},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
