@@ -97,10 +97,14 @@ import dj_database_url
 
 DATABASE_URL = os.getenv('DATABASE_URL')
 if DATABASE_URL:
+    # Detect if DATABASE_URL connects to a PgBouncer / Session Pooler (pooler domain or port 6543)
+    is_pooler = 'pooler' in DATABASE_URL.lower() or ':6543' in DATABASE_URL
+    max_age = 0 if is_pooler else 600
+
     DATABASES = {
         'default': dj_database_url.config(
             default=DATABASE_URL,
-            conn_max_age=600,
+            conn_max_age=max_age,
             conn_health_checks=True,
             ssl_require=True,
         )
