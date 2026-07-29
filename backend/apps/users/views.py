@@ -172,6 +172,10 @@ class LoginView(APIView):
         if serializer.is_valid():
             user = serializer.validated_data["user"]
 
+            # Record last login timestamp on actual login event
+            from django.contrib.auth.models import update_last_login
+            update_last_login(None, user)
+
             # Clear failed login attempts on successful authentication
             FailedLoginAttempt.clear_failures(user.email)
 
